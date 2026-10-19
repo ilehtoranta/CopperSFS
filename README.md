@@ -4,11 +4,12 @@ CopperSFS is an experimental, allocation-free implementation of the classic
 Amiga Smart File System on-disk format (`SFS\0`). This repository contains the
 portable filesystem core and its host tests.
 
-**Status: source preview. No binary handler release is available from this
-repository.** Do not rely on it as the only copy of important data. The
-standalone AmigaOS `L:` handler is not included. Its startup, read/write,
-remount and interrupted-write behavior has not yet been qualified under a
-native ROM. The core tests are not a substitute for that native test.
+**Status: experimental preview.** A compiled AmigaOS `L:` handler is available
+in [prereleases](https://github.com/ilehtoranta/CopperSFS/releases); its source
+is not part of this repository. See the [installation guide](docs/handler-install.md)
+before trying it on a disposable SFS volume. Native AmigaOS startup,
+read/write, remount and interrupted-write behavior has not yet been qualified.
+Do not rely on it as the only copy of important data.
 
 ## What is here
 
@@ -18,6 +19,7 @@ native ROM. The core tests are not a substitute for that native test.
 - `tests/CopperSFS.Core.Tests`: 30 semantic tests for traversal, mutation,
   interleaved file operations, interrupted writes, recovery and sparse volumes
   larger than 4 GiB.
+
 Public types use the `CopperSFS` namespace. Integrators supply their own block
 device and guest-memory adapter through the platform interfaces.
 
@@ -51,8 +53,8 @@ CopperSFS is a new implementation and is not the original
 [Smart File System C project](https://sourceforge.net/projects/smartfilesystem/).
 That project's source is published under LGPLv2. This repository is
 MIT-licensed; the original C source is not included. The classic format
-references and independent validation
-sources are listed in [provenance](docs/provenance.md).
+references and independent validation sources are listed in
+[provenance](docs/provenance.md).
 
 Contributions and independent disk-image compatibility reports are welcome.
 Please use disposable images when testing writes and include the exact handler,

@@ -1,0 +1,18 @@
+/* Replace every CHANGE_ME value with the existing test partition's values. */
+FileSystem      = L:CopperSFS
+Device          = CHANGE_ME
+Unit            = CHANGE_ME
+Flags           = 0
+Surfaces        = CHANGE_ME
+SectorsPerBlock = CHANGE_ME
+SectorsPerTrack = CHANGE_ME
+LowCyl          = CHANGE_ME
+HighCyl         = CHANGE_ME
+SizeBlock       = CHANGE_ME
+Reserved        = CHANGE_ME
+Buffers         = 32
+MaxTransfer     = CHANGE_ME
+Mask            = CHANGE_ME
+DosType         = 0x53465300
+StackSize       = 32768
+Forceload       = 1
