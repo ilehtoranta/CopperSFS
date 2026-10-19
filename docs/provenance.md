@@ -1,8 +1,8 @@
 # Provenance
 
-The implementation and tests in this repository were extracted from the
-MIT-licensed CopperStart source tree. No original Smart File System C files,
-ROM images, disk images or game media are included.
+The implementation and tests in this repository are MIT-licensed original
+work. No original Smart File System C files, ROM images, disk images or game
+media are included.
 
 The on-disk layout work used the original Smart File System structures as
 references, especially `blockstructure.h`, `objects.h`, `nodes.h`,

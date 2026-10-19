@@ -1,6 +1,6 @@
 using Amiga;
 
-namespace CopperStart.Dos;
+namespace CopperSFS;
 
 /// <summary>
 /// Allocation-free writes to classic SFS volumes. A write-ahead undo chain

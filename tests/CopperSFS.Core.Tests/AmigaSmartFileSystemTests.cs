@@ -1,7 +1,7 @@
 using System.Buffers.Binary;
 using System.Text;
 using Amiga;
-using CopperStart.Dos;
+using CopperSFS;
 
 namespace CopperSFS.Tests;
 

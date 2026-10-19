@@ -1,6 +1,6 @@
 using Amiga;
 
-namespace CopperStart.Dos;
+namespace CopperSFS;
 
 /// <summary>Caller-owned block I/O and guest memory for the SFS core.</summary>
 public interface IAmigaFileSystemPlatform : IAmigaGuestMemory

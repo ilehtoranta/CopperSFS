@@ -1,6 +1,6 @@
 using Amiga;
 
-namespace CopperStart.Dos;
+namespace CopperSFS;
 
 /// <summary>
 /// Classic SFS (SFS\0) traversal. Keys are SFS object-node numbers.
@@ -28,7 +28,7 @@ public static class AmigaSmartFileSystemCore
         number < p.Geometry.BlockCount && p.ReadBlock(number, buffer) &&
         p.ReadUInt32(buffer) == id && p.ReadUInt32(buffer, 8) == number && Checksum(ref p, buffer);
 
-    internal static bool Root<T>(ref T p, APTR buffer) where T : struct, IAmigaFileSystemPlatform
+    public static bool Root<T>(ref T p, APTR buffer) where T : struct, IAmigaFileSystemPlatform
     {
         var geometry = p.Geometry;
         if (geometry.BlockCount < 4 || geometry.BlockBytes < 512) return false;

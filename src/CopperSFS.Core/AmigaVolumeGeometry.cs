@@ -1,6 +1,6 @@
 using Amiga;
 
-namespace CopperStart.Dos;
+namespace CopperSFS;
 
 /// <summary>Partition-relative filesystem blocks and the underlying device byte range.</summary>
 public struct AmigaVolumeGeometry

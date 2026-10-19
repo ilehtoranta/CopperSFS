@@ -6,11 +6,8 @@ interleaved reads and writes, injected failures at write and flush points, and
 recovery after an interrupted upper-block append on a sparse logical volume
 larger than 4 GiB.
 
-CopperStart separately passed a compiled MC68000 replay that wrote to an SFS
-partition located above the 4 GiB physical offset and read it after a fresh
-boot. That replay used a headless storage qualification ROM and the `$E00000`
-SFS extension. It is evidence for the storage path, not for the standalone
-`L:` handler or a complete graphical Kickstart image.
+These tests exercise the core on the host. They do not establish the behavior
+of a compiled MC68000 handler or a complete AmigaOS boot path.
 
 Before a binary handler release, test `ACTION_STARTUP`, reads, writes,
 remounting, concurrent DOS tasks and interrupted writes under a native

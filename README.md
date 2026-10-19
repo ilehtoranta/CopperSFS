@@ -1,14 +1,12 @@
 # CopperSFS
 
 CopperSFS is an experimental, allocation-free implementation of the classic
-Amiga Smart File System on-disk format (`SFS\0`). It began in CopperStart, but the core is
-available here as a separate library so it can be tested and improved without
-the rest of that operating system.
+Amiga Smart File System on-disk format (`SFS\0`). This repository contains the
+portable filesystem core and its host tests.
 
 **Status: source preview. No binary handler release is available from this
 repository.** Do not rely on it as the only copy of important data. The
-standalone `L:CopperSFS` handler source is included here, but its current build
-still uses CopperStart's DOS and Exec runtime. Its AmigaOS startup, read/write,
+standalone AmigaOS `L:` handler is not included. Its startup, read/write,
 remount and interrupted-write behavior has not yet been qualified under a
 native ROM. The core tests are not a substitute for that native test.
 
@@ -20,13 +18,8 @@ native ROM. The core tests are not a substitute for that native test.
 - `tests/CopperSFS.Core.Tests`: 30 semantic tests for traversal, mutation,
   interleaved file operations, interrupted writes, recovery and sparse volumes
   larger than 4 GiB.
-- `integration/CopperStart`: the `L:` startup and `$E00000` extension bridge
-  currently built by CopperStart. This is source for review and integration;
-  it is not yet an independently buildable handler project.
-
-The public types currently retain the `CopperStart.Dos` namespace so existing
-CopperStart callers can consume this assembly without an ABI rename. The
-assembly and repository are named CopperSFS.
+Public types use the `CopperSFS` namespace. Integrators supply their own block
+device and guest-memory adapter through the platform interfaces.
 
 The engine does not format volumes. It uses classic 32-bit AmigaDOS file sizes
 and seek positions. A partition above 4 GiB additionally needs a block device
@@ -56,9 +49,9 @@ they do not execute a compiled MC68000 handler. See
 
 CopperSFS is a new implementation and is not the original
 [Smart File System C project](https://sourceforge.net/projects/smartfilesystem/).
-That project's source is published under LGPLv2. This repository contains
-source extracted from CopperStart under its MIT license; the original C source
-is not included. The classic format references and independent validation
+That project's source is published under LGPLv2. This repository is
+MIT-licensed; the original C source is not included. The classic format
+references and independent validation
 sources are listed in [provenance](docs/provenance.md).
 
 Contributions and independent disk-image compatibility reports are welcome.

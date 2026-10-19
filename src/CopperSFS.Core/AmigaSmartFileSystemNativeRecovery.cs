@@ -1,6 +1,6 @@
 using Amiga;
 
-namespace CopperStart.Dos;
+namespace CopperSFS;
 
 public static partial class AmigaSmartFileSystemWriteCore
 {
