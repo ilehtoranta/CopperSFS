@@ -14,5 +14,7 @@ being silently accepted. The journal reserves free blocks temporarily, so a
 mutation can report a full disk before every free data block is consumed.
 
 The core assumes the block device preserves completed block writes across
-flush barriers. The external `L:` handler and native-ROM power-cut replay
-remain unqualified. There is no formatter or RDB autoboot installer here.
+flush barriers. The external `L:` handler has passed a limited Kickstart 3.1
+emulator replay, including one interrupted-write recovery point; see
+[validation](validation.md) for the exact boundary. There is no formatter or
+RDB autoboot installer here.

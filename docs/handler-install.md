@@ -2,7 +2,7 @@
 
 The `CopperSFS` prerelease package contains a compiled MC68000 Amiga HUNK for
 installation as `L:CopperSFS`. Handler source is not included in this repository.
-This is an **unqualified preview**: use a disposable SFS volume, keep an
+This is an **experimental preview**: use a disposable SFS volume, keep an
 independent backup, and do not make it your only boot or data volume. It does
 not format disks or install itself in the RDB.
 
@@ -43,8 +43,11 @@ to let its `CSUN` undo journal recover before trying another SFS handler.
 Recovery needs an intact journal and working flush barriers. If recovery
 fails, preserve the image and stop writing to it.
 
-Native AmigaOS startup, concurrent task I/O and interrupted-write recovery
-still need independent qualification. The core's host tests and an image
-compiled for MC68000 do not establish those results. Please report the OS
+Native Kickstart 3.1 tests in an A500 emulator exercised startup, reads,
+writes, fresh-boot remount, two concurrent writer tasks with a reader, and
+recovery from one captured interrupted transaction. These tests used a
+synthetic floppy image and the CopperSFS core for host-side consistency checks.
+Physical Amigas, other ROMs and devices, independently formatted media and
+additional power-cut points still need qualification. Please report the OS
 version, device, partition geometry and exact steps with a reproducible
 disposable image; do not upload licensed ROMs or private data.

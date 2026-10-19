@@ -411,13 +411,25 @@ public static partial class AmigaSmartFileSystemWriteCore
         if (r.Length == 0 || r.Length > 255 || !p.IsMapped(r.Name, r.Length))
             return Fail(ref w, DOS.Error.InvalidComponentName);
         var segment = 0u;
+        var volumePrefix = false;
         for (var i = 0u; i < r.Length; i++)
-            if (p.ReadUInt8(r.Name, (int)i) is (byte)'/' or (byte)':') segment = i + 1;
+        {
+            var separator = p.ReadUInt8(r.Name, (int)i);
+            if (separator is (byte)'/' or (byte)':')
+            {
+                segment = i + 1;
+                volumePrefix = separator == (byte)':';
+            }
+        }
         if (segment != 0)
         {
-            var parent = AmigaSmartFileSystemCore.Resolve(ref p, r.Directory, r.Name, segment - 1, w.Meta, out var error);
-            if (parent == 0) return Fail(ref w, error);
-            r.Directory = parent;
+            if (volumePrefix) r.Directory = AmigaSmartFileSystemCore.RootNode;
+            else
+            {
+                var parent = AmigaSmartFileSystemCore.Resolve(ref p, r.Directory, r.Name, segment - 1, w.Meta, out var error);
+                if (parent == 0) return Fail(ref w, error);
+                r.Directory = parent;
+            }
             r.Name = APTR.FromPointer(r.Name.Raw + segment); r.Length -= segment;
         }
         if (r.Length == 0 || r.Length > 100) return Fail(ref w, DOS.Error.InvalidComponentName);

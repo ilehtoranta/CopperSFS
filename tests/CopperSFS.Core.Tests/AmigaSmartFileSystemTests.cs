@@ -463,6 +463,24 @@ public sealed class AmigaSmartFileSystemTests
     }
 
     [Fact]
+    public void CreateAcceptsVolumeQualifiedRootFilename()
+    {
+        var p = new Disk(Image());
+        var meta = APTR.FromPointer(512);
+        var work = new AmigaSmartFileSystemWriteCore.Work
+        { Meta = meta, Data = APTR.FromPointer(1024), Bitmap = APTR.FromPointer(1536), Journal = APTR.FromPointer(2048) };
+        const string path = "SFS0:NativeWrite";
+        var create = new AmigaSmartFileSystemWriteCore.Request
+        { Directory = 1, Name = p.Name(path), Length = (uint)path.Length };
+        Assert.True(AmigaSmartFileSystemWriteCore.Create(ref p, ref work, ref create, false));
+        Assert.Equal(5u, create.Node);
+        Assert.True(AmigaSmartFileSystemCore.Mount(ref p, meta));
+        Assert.Equal(create.Node, AmigaSmartFileSystemCore.Resolve(ref p, 1,
+            p.Name("NativeWrite"), 11, meta, out var error));
+        Assert.Equal(DOS.Error.None, error);
+    }
+
+    [Fact]
     public void AppendUsesNewExtentWhenNextPhysicalBlockIsOccupied()
     {
         var p = new Disk(Image());
