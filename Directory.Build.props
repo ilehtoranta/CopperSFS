@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <CopperSharp68kRoot Condition="'$(CopperSharp68kRoot)' == ''">$(MSBuildThisFileDirectory)..\CopperSharp68k</CopperSharp68kRoot>
+    <CopperSharpSdkAmigaVersion Condition="'$(CopperSharpSdkAmigaVersion)' == ''">0.1.0-preview.1-g20</CopperSharpSdkAmigaVersion>
+  </PropertyGroup>
+</Project>

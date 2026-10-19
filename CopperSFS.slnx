@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CopperSFS.Core/CopperSFS.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CopperSFS.Core.Tests/CopperSFS.Core.Tests.csproj" />
+  </Folder>
+  <Project Path="../CopperSharp68k/Compiler/CopperSharp.Compiler.csproj" />
+  <Project Path="../CopperSharp68k/Sdk.Amiga.Support/CopperSharp.Sdk.Amiga.Support.csproj" />
+  <Project Path="../CopperSharp68k/Sdk.Amiga/CopperSharp.Sdk.Amiga.csproj" />
+</Solution>

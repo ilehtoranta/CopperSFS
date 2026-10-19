@@ -1,0 +1,22 @@
+name: Build and test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  core:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: CopperSFS
+      - uses: actions/checkout@v4
+        with:
+          repository: ilehtoranta/CopperSharp68k
+          path: CopperSharp68k
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Test SFS core
+        run: dotnet test CopperSFS/CopperSFS.slnx -c Release
