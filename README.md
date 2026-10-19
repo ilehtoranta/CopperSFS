@@ -7,10 +7,10 @@ the rest of that operating system.
 
 **Status: source preview. No binary handler release is available from this
 repository.** Do not rely on it as the only copy of important data. The
-standalone `L:CopperSFS` handler currently lives in CopperStart while its
-AmigaOS startup, read/write, remount and interrupted-write behavior is being
-qualified under a native ROM. The core in this repository is buildable and
-covered by host semantic tests; it is not a substitute for that native test.
+standalone `L:CopperSFS` handler source is included here, but its current build
+still uses CopperStart's DOS and Exec runtime. Its AmigaOS startup, read/write,
+remount and interrupted-write behavior has not yet been qualified under a
+native ROM. The core tests are not a substitute for that native test.
 
 ## What is here
 
@@ -20,6 +20,9 @@ covered by host semantic tests; it is not a substitute for that native test.
 - `tests/CopperSFS.Core.Tests`: 30 semantic tests for traversal, mutation,
   interleaved file operations, interrupted writes, recovery and sparse volumes
   larger than 4 GiB.
+- `integration/CopperStart`: the `L:` startup and `$E00000` extension bridge
+  currently built by CopperStart. This is source for review and integration;
+  it is not yet an independently buildable handler project.
 
 The public types currently retain the `CopperStart.Dos` namespace so existing
 CopperStart callers can consume this assembly without an ABI rename. The
