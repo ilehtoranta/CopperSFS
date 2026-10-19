@@ -18,8 +18,9 @@ not format disks or install itself in the RDB.
 
 ## Install on a test volume
 
-1. Check the package SHA-256 against `SHA256SUMS.txt` from the same release.
-   Copy the `CopperSFS` executable to `L:CopperSFS` on your boot volume.
+1. Check the downloaded ZIP against the attached `.zip.sha256` file. After
+   extraction, `SHA256SUMS.txt` lists the checksums of the files inside. Copy
+   the `CopperSFS` executable to `L:CopperSFS` on your boot volume.
 2. Copy `SFS0.mount.example` to `DEVS:DOSDrivers/SFS0`, then replace every
    `CHANGE_ME` field with the values of the **existing test partition**. Check
    `SizeBlock`, `SectorsPerBlock`, `Reserved`, `MaxTransfer` and `Mask` against
