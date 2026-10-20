@@ -1,4 +1,8 @@
 <Project>
+  <!-- When embedded, share the host repository's SDK selection before applying
+       standalone defaults. Otherwise restore can mix SDK packages and projects. -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))"
+          Condition="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../')) != ''" />
   <PropertyGroup>
     <CopperSharp68kRoot Condition="'$(CopperSharp68kRoot)' == ''">$(MSBuildThisFileDirectory)..\CopperSharp68k</CopperSharp68kRoot>
     <CopperSharpSdkAmigaVersion Condition="'$(CopperSharpSdkAmigaVersion)' == ''">0.1.0-preview.1-g20</CopperSharpSdkAmigaVersion>

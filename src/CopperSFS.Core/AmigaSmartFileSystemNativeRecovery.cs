@@ -28,10 +28,10 @@ public static partial class AmigaSmartFileSystemWriteCore
         out byte value, out bool end) where T : struct, IAmigaWritableFileSystemPlatform
     {
         value = 0; end = false;
-        if (cursor.Offset == p.Geometry.BlockBytes)
+        if (cursor.Offset == w.BlockBytes)
         {
             if (cursor.Next == 0) { end = true; return true; }
-            if (cursor.Visited >= p.Geometry.BlockCount ||
+            if (cursor.Visited >= w.BlockCount ||
                 !AmigaSmartFileSystemCore.Block(ref p, cursor.Next, NativeRedoId, w.Journal))
                 return Fail(ref w, DOS.Error.DiskNotValidated);
             cursor.Next = p.ReadUInt32(w.Journal, 12);
@@ -53,7 +53,7 @@ public static partial class AmigaSmartFileSystemWriteCore
         where T : struct, IAmigaWritableFileSystemPlatform
     {
         if (!StartNative(ref p, ref w, first, out var cursor)) return false;
-        var words = p.Geometry.BlockBytes / 4;
+        var words = w.BlockBytes / 4;
         // Every iteration consumes stream bytes. NativeByte bounds the chain
         // to BlockCount records, so no separate wide operation counter is needed.
         while (true)
@@ -63,7 +63,7 @@ public static partial class AmigaSmartFileSystemWriteCore
             if (!NativeRequired(ref p, ref w, ref cursor, out var low)) return false;
             var length = (uint)(high << 8 | low);
             if (length == 0) return true;
-            if (length > p.Geometry.BlockBytes + p.Geometry.BlockBytes / 4 + 16)
+            if (length > w.BlockBytes + w.BlockBytes / 4 + 16)
                 return Fail(ref w, DOS.Error.DiskNotValidated);
             uint target = 0;
             for (var i = 0; i < 4; i++)
@@ -72,11 +72,11 @@ public static partial class AmigaSmartFileSystemWriteCore
                 target = (target << 8) | part;
             }
             if (!NativeRequired(ref p, ref w, ref cursor, out var bits)) return false;
-            if (target < p.Geometry.ReservedBlocks || target >= p.Geometry.BlockCount - 1 ||
+            if (target < w.ReservedBlocks || target >= w.BlockCount - 1 ||
                 (bits & ~1) != 0) return Fail(ref w, DOS.Error.DiskNotValidated);
             if (apply)
             {
-                if ((bits & 1) != 0) p.Clear(w.Data, p.Geometry.BlockBytes);
+                if ((bits & 1) != 0) p.Clear(w.Data, w.BlockBytes);
                 else if (!p.ReadBlock(target, w.Data)) return Fail(ref w, DOS.Error.DiskNotValidated);
             }
             uint consumed = 0, word = 0;
@@ -125,9 +125,9 @@ public static partial class AmigaSmartFileSystemWriteCore
         if (!NativePass(ref p, ref w, first, false)) return false;
         if (!NativePass(ref p, ref w, first, true) || !p.Flush())
             return Fail(ref w, DOS.Error.DiskNotValidated);
-        p.Clear(w.Meta, p.Geometry.BlockBytes);
+        p.Clear(w.Meta, w.BlockBytes);
         p.WriteUInt32(w.Meta, 0, TransactionOk); p.WriteUInt32(w.Meta, 8, marker);
-        Seal(ref p, w.Meta);
+        Seal(ref p, w.Meta, w.BlockBytes);
         return (p.WriteBlock(marker, w.Meta) && p.Flush()) || Fail(ref w, DOS.Error.DiskNotValidated);
     }
 }

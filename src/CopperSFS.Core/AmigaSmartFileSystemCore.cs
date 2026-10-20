@@ -13,33 +13,56 @@ public static class AmigaSmartFileSystemCore
     public const uint RootNode = 1;
     private const uint RootId = DosType, ObjectId = 0x4F424A43, NodeId = 0x4E444320, TreeId = 0x424E4443;
 
-    private static bool Checksum<T>(ref T p, APTR block) where T : struct, IAmigaFileSystemPlatform
+    internal static uint BlockSum<T>(ref T p, APTR block, uint bytes) where T : struct, IAmigaFileSystemPlatform
     {
+        var remaining = bytes;
+        var cursor = block;
         uint sum = 0;
-        for (var i = 0; i < p.Geometry.BlockBytes; i += 4) sum = unchecked(sum + p.ReadUInt32(block, (int)i));
-        // SFS CALCCHECKSUM starts at one; a valid block sums to 0xFFFFFFFF.
-        return sum == uint.MaxValue;
+        while (remaining >= 16)
+        {
+            sum = unchecked(sum + p.ReadUInt32(cursor, 0) + p.ReadUInt32(cursor, 4) +
+                p.ReadUInt32(cursor, 8) + p.ReadUInt32(cursor, 12));
+            cursor = APTR.FromPointer(cursor.Raw + 16); remaining -= 16;
+        }
+        while (remaining >= 4)
+        {
+            sum = unchecked(sum + p.ReadUInt32(cursor));
+            cursor = APTR.FromPointer(cursor.Raw + 4); remaining -= 4;
+        }
+        return sum;
     }
+
+    // SFS CALCCHECKSUM starts at one; a valid block sums to 0xFFFFFFFF.
+    private static bool Checksum<T>(ref T p, APTR block) where T : struct, IAmigaFileSystemPlatform
+        => BlockSum(ref p, block, p.Geometry.BlockBytes) == uint.MaxValue;
 
     internal static bool ValidChecksum<T>(ref T p, APTR block)
         where T : struct, IAmigaFileSystemPlatform => Checksum(ref p, block);
 
-    internal static bool Block<T>(ref T p, uint number, uint id, APTR buffer) where T : struct, IAmigaFileSystemPlatform =>
-        number < p.Geometry.BlockCount && p.ReadBlock(number, buffer) &&
-        p.ReadUInt32(buffer) == id && p.ReadUInt32(buffer, 8) == number && Checksum(ref p, buffer);
+    internal static bool Block<T>(ref T p, uint number, uint id, APTR buffer) where T : struct, IAmigaFileSystemPlatform
+    {
+        var geometry = p.Geometry;
+        return Block(ref p, number, id, buffer, geometry.BlockCount, geometry.BlockBytes);
+    }
+
+    internal static bool Block<T>(ref T p, uint number, uint id, APTR buffer, uint blockCount, uint blockBytes)
+        where T : struct, IAmigaFileSystemPlatform =>
+        number < blockCount && p.ReadBlock(number, buffer) &&
+        p.ReadUInt32(buffer) == id && p.ReadUInt32(buffer, 8) == number &&
+        BlockSum(ref p, buffer, blockBytes) == uint.MaxValue;
 
     public static bool Root<T>(ref T p, APTR buffer) where T : struct, IAmigaFileSystemPlatform
     {
         var geometry = p.Geometry;
         if (geometry.BlockCount < 4 || geometry.BlockBytes < 512) return false;
-        var first = Block(ref p, 0, RootId, buffer) && p.ReadUInt16(buffer, 12) == 3 &&
+        var first = Block(ref p, 0, RootId, buffer, geometry.BlockCount, geometry.BlockBytes) && p.ReadUInt16(buffer, 12) == 3 &&
             p.ReadUInt32(buffer, 48) == geometry.BlockCount && p.ReadUInt32(buffer, 52) == geometry.BlockBytes;
         var firstSequence = first ? p.ReadUInt16(buffer, 14) : 0;
         var last = geometry.BlockCount - 1;
-        if (Block(ref p, last, RootId, buffer) && p.ReadUInt16(buffer, 12) == 3 &&
+        if (Block(ref p, last, RootId, buffer, geometry.BlockCount, geometry.BlockBytes) && p.ReadUInt16(buffer, 12) == 3 &&
             p.ReadUInt32(buffer, 48) == geometry.BlockCount && p.ReadUInt32(buffer, 52) == geometry.BlockBytes &&
             (!first || (short)(p.ReadUInt16(buffer, 14) - firstSequence) > 0)) return true;
-        return first && Block(ref p, 0, RootId, buffer);
+        return first && Block(ref p, 0, RootId, buffer, geometry.BlockCount, geometry.BlockBytes);
     }
 
     public static bool Mount<T>(ref T p, APTR metadata) where T : struct, IAmigaFileSystemPlatform
@@ -234,7 +257,8 @@ public static class AmigaSmartFileSystemCore
         if (length == 0) return 0;
         if (!Root(ref p, metadata)) { error = DOS.Error.DiskNotValidated; return -1; }
         var tree = p.ReadUInt32(metadata, 108);
-        var blockBytes = p.Geometry.BlockBytes;
+        var geometry = p.Geometry;
+        var blockBytes = geometry.BlockBytes;
         var fileBlock = position / blockBytes;
         var extent = first; var extentStart = 0u; var extentSize = 0u; var next = 0u;
         var copied = 0u;
@@ -246,11 +270,18 @@ public static class AmigaSmartFileSystemCore
                 if (extent == 0 || !Extent(ref p, tree, extent, metadata, out extentSize, out next)) goto failed;
             }
             var diskBlock = extent + fileBlock - extentStart;
-            if (diskBlock >= p.Geometry.BlockCount || !p.ReadBlock(diskBlock, data)) goto failed;
             var within = position % blockBytes;
             var count = blockBytes - within;
             if (count > length - copied) count = length - copied;
-            for (var i = 0u; i < count; i++) p.WriteUInt8(destination, (int)(copied + i), p.ReadUInt8(data, (int)(within + i)));
+            var target = APTR.FromPointer(destination.Raw + copied);
+            // ReadBlock owns any device/DMA bounce buffering. A complete,
+            // aligned caller range can receive the block without a byte copy.
+            var direct = within == 0 && count == blockBytes && (target.Raw & 3) == 0;
+            var readTarget = data;
+            if (direct) readTarget = target;
+            if (diskBlock >= geometry.BlockCount || !p.ReadBlock(diskBlock, readTarget)) goto failed;
+            if (!direct)
+                for (var i = 0u; i < count; i++) p.WriteUInt8(destination, (int)(copied + i), p.ReadUInt8(data, (int)(within + i)));
             copied += count; position += count; fileBlock++;
         }
         return (int)copied;
