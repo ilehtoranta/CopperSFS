@@ -1026,6 +1026,30 @@ public sealed partial class AmigaSmartFileSystemTests
         Assert.Equal(0x54524641u, BinaryPrimitives.ReadUInt32BigEndian(Block(image, 4)));
     }
 
+    [Theory]
+    [InlineData(true, 16)]
+    [InlineData(true, 508)]
+    [InlineData(false, 28)]
+    [InlineData(false, 508)]
+    public void RecoveryChecksTheZeroTailOfJournalHeaders(bool marker, int offset)
+    {
+        var image = Image();
+        var p = new Disk(image) { FailAtWrite = 5 };
+        var work = new AmigaSmartFileSystemWriteCore.Work
+        { Meta = APTR.FromPointer(512), Data = APTR.FromPointer(1024),
+            Bitmap = APTR.FromPointer(1536), Journal = APTR.FromPointer(2048) };
+        var request = new AmigaSmartFileSystemWriteCore.Request
+        { Directory = 1, Name = p.Name("Interrupted"), Length = 11 };
+        Assert.False(AmigaSmartFileSystemWriteCore.Create(ref p, ref work, ref request, false));
+        var head = BinaryPrimitives.ReadUInt32BigEndian(Block(image, 4)[12..]);
+        var target = marker ? 4 : (int)head;
+        Assert.Equal(0, Block(image, target)[offset]);
+        Block(image, target)[offset] = 1;
+        var restarted = new Disk(image);
+        Assert.False(AmigaSmartFileSystemWriteCore.Recover(ref restarted, ref work));
+        Assert.Equal(0x54524641u, BinaryPrimitives.ReadUInt32BigEndian(Block(image, 4)));
+    }
+
     [Fact]
     public void InterleavedFileWritesAndReadsKeepEachCommittedStreamIndependent()
     {

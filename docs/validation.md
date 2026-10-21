@@ -1,6 +1,6 @@
 # Validation boundary
 
-On 2026-10-20 the standalone core's 109 host semantic tests passed in Debug
+On 2026-10-20 the standalone core's 113 host semantic tests passed in Debug
 and Release configurations. They cover allocation, metadata and directory mutation,
 interleaved reads and writes, injected failures at write and flush points, and
 recovery after an interrupted upper-block append on a sparse logical volume
@@ -12,14 +12,19 @@ that could reach media before a flush. Allocation tests cover used bitmap
 words and cursor wraparound, including every write/flush interruption point.
 Transfer tests cover aligned and unaligned buffers, partial sectors, fragmented
 files, and preservation of bytes outside an overwritten range. These are host
-semantic tests, not compiled MC68000 execution.
+semantic tests, not compiled MC68000 execution. Four checksum regression cases
+corrupt the zero tail of transaction markers and undo headers and require
+recovery to reject the damaged block.
 
-Eight compiled MC68000 transfer cases also passed for reads and overwrites,
-including aligned and unaligned buffers, fragmented extents, and guard bytes.
-They execute the core against a RAM-backed test platform; they do not boot
-AmigaDOS or establish real-device DMA behavior.
+Thirty-seven focused compiled MC68000 cases also passed. They cover aligned
+and unaligned transfers, fragmented extents, guard bytes, copy and clear
+boundaries, forward overlap, DMA masks and memory requirements, transfer
+splitting, and TD64 offsets. They use RAM-backed platforms, Exec copy service
+doubles, and recording device boundaries. Native AmigaDOS and real Exec
+execution are covered separately by the booted tests below; these instruction
+tests do not establish real-device DMA behavior.
 
-The current batched MC68000 handler passed all 12 native A/B tests against
+The current optimized MC68000 handler passed all 12 native A/B tests against
 original SmartFilesystem 1.279 under Kickstart 3.1, using a 68020 emulator
 profile with 512 KiB chip RAM and 2 MiB fast RAM. Each independent workload
 started from its own byte-for-byte copy of the same independently formatted
@@ -43,7 +48,27 @@ for each of five cold workloads, plus separate repeated-read trials after
 warming the cache. Measurements exclude boot and image-copy time and describe
 guest CPU cycles and device I/O, not physical Amiga throughput.
 The tested handler's SHA-256 is
-`304F2D04AF19277DAD1E911CF5D060549D4DBB3A43D537260AE7ABB028639622`.
+`B35735D4DDFA32E8AC349DE97061783D5DA01F45C97E3E3CECD80E0923A128CD`.
+
+Compared with the previous optimized build (`EE2A78382C28…`), the sequential
+1 MiB write median fell from 152,281,271 to 103,448,180 guest CPU cycles:
+32% fewer cycles, or 1.47 times faster. Original 1.279 measured 14,419,369 cycles
+in the same run, leaving a 7.17-times CPU gap, down from 10.56 times.
+CopperSFS still issued 1,162 sector reads, 3,857 sector writes and 517 flushes.
+Sector reads, writes and flushes were unchanged in all 60 corresponding trials
+across both handlers and all workloads. The compiler and emulator versions,
+ROM, workload, geometry and immutable base image matched the preceding run.
+
+The gains come from reusing geometry within operations, avoiding unnecessary
+buffer copies, using Exec's copy routines, advancing transaction-buffer slot
+pointers, and unrolling checksum sums. Checksum generation for freshly cleared
+journal headers sums their populated prefix; reads and recovery still validate
+the entire block. Transaction boundaries and durability barriers are unchanged.
+An audit confirmed identical ordered sector writes and flushes for all five
+CopperSFS recovery workloads compared with the preceding build.
+Sequential reads improved 1.34 times, small-file creation 1.47 times, directory
+enumeration 1.44 times, and mixed access 1.42 times. The compiled handler grew
+by 396 bytes to 83,488 bytes.
 
 The preview handler is compiled for MC68000. A separate check loaded and
 unloaded its HUNK with native AmigaDOS `LoadSeg` and `UnLoadSeg`. In an emulated

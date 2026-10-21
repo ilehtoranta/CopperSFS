@@ -201,7 +201,10 @@ public static partial class AmigaSmartFileSystemWriteCore
         p.WriteUInt32(w.Journal, 12, w.JournalHead);
         p.WriteUInt32(w.Journal, 16, target); p.WriteUInt32(w.Journal, 20, image);
         p.WriteUInt32(w.Journal, 24, originalSum);
-        Seal(ref p, w.Journal, w.BlockBytes);
+        // This newly cleared block has only seven populated longwords. Its
+        // zero tail contributes nothing; reads and replay still check the
+        // entire on-disk block, including that tail.
+        Seal(ref p, w.Journal, 28);
         if (!p.WriteBlock(entry, w.Journal))
             return Fail(ref w, DOS.Error.DiskNotValidated);
         w.JournalHead = entry;
@@ -226,7 +229,8 @@ public static partial class AmigaSmartFileSystemWriteCore
         p.WriteUInt32(w.Journal, 0, TransactionFailed);
         p.WriteUInt32(w.Journal, 8, w.RootContainer + 2);
         p.WriteUInt32(w.Journal, 12, w.JournalHead);
-        Seal(ref p, w.Journal, w.BlockBytes);
+        // The rest of this freshly cleared marker is zero.
+        Seal(ref p, w.Journal, 16);
         if (!p.WriteBlock(w.RootContainer + 2, w.Journal) || !p.Flush())
             return Fail(ref w, DOS.Error.DiskNotValidated);
         w.PublishedHead = w.JournalHead;
@@ -315,7 +319,8 @@ public static partial class AmigaSmartFileSystemWriteCore
         if (entry != 0 || !p.Flush()) return Fail(ref w, DOS.Error.DiskNotValidated);
         p.Clear(w.Meta, w.BlockBytes);
         p.WriteUInt32(w.Meta, 0, TransactionOk); p.WriteUInt32(w.Meta, 8, marker);
-        Seal(ref p, w.Meta, w.BlockBytes);
+        // The rest of this freshly cleared marker is zero.
+        Seal(ref p, w.Meta, 12);
         return (p.WriteBlock(marker, w.Meta) && p.Flush()) || Fail(ref w, DOS.Error.DiskNotValidated);
     }
 
@@ -829,7 +834,8 @@ public static partial class AmigaSmartFileSystemWriteCore
         var key = first; var start = 0u;
         for (var guard = 0u; key != 0 && guard < w.BlockCount; guard++)
         {
-            if (!AmigaSmartFileSystemCore.Extent(ref p, w.ExtentRoot, key, w.Meta, out var count, out var next))
+            if (!AmigaSmartFileSystemCore.Extent(ref p, w.ExtentRoot, key, w.Meta,
+                w.BlockCount, w.BlockBytes, out var count, out var next))
                 return Fail(ref w, DOS.Error.DiskNotValidated);
             lastKey = key; lastSize = count; lastStart = start;
             if (index < start + count) { diskBlock = key + index - start; return true; }
@@ -1527,7 +1533,7 @@ public static partial class AmigaSmartFileSystemWriteCore
             var current = first; var start = 0u;
             for (var guard = 0u; current != 0 && guard < w.BlockCount; guard++)
             {
-                if (!AmigaSmartFileSystemCore.Extent(ref p, w.ExtentRoot, current, w.Meta,
+                if (!AmigaSmartFileSystemCore.Extent(ref p, w.ExtentRoot, current, w.Meta, w.BlockCount, w.BlockBytes,
                     out var count, out var next)) return Fail(ref w, DOS.Error.DiskNotValidated);
                 if (start >= newBlocks)
                 {
