@@ -6,11 +6,12 @@ portable filesystem core and its host tests.
 
 **Status: experimental preview.** A compiled AmigaOS `L:` handler is available
 in [prereleases](https://github.com/ilehtoranta/CopperSFS/releases); its source
-is not part of this repository. An emulated A500 running a licensed Kickstart
-3.1 ROM has exercised native AmigaDOS startup, reads, writes, remount,
-concurrent tasks and one interrupted-write recovery point. Other ROM versions,
-physical hardware, independently formatted media and broader power-cut points
-remain unqualified. See the [installation guide](docs/handler-install.md) and
+is not part of this repository. The external handler has been compared with
+original SmartFilesystem 1.279 under Kickstart 3.1, including clean handoff and
+write/flush interruption sweeps. Source changes and published preview binaries
+have separate qualification records: see [validation](docs/validation.md).
+Other ROM versions and physical hardware remain unqualified. See the
+[installation guide](docs/handler-install.md) and
 use only a disposable volume with an independent backup.
 
 ## What is here
@@ -18,7 +19,7 @@ use only a disposable volume with an independent backup.
 - `src/CopperSFS.Core`: read, write and recovery logic for classic `SFS\0`
   volumes. The caller supplies block I/O, big-endian guest memory and scratch
   buffers through `IAmigaFileSystemPlatform`.
-- `tests/CopperSFS.Core.Tests`: 30 semantic tests for traversal, mutation,
+- `tests/CopperSFS.Core.Tests`: semantic tests for traversal, mutation,
   interleaved file operations, interrupted writes, recovery and sparse volumes
   larger than 4 GiB.
 
@@ -33,6 +34,12 @@ CopperSFS writes a private `CSUN` undo journal. If power is lost during a
 CopperSFS mutation, remount with CopperSFS to recover it before exposing the
 volume through another SFS implementation. Recovery requires a writable device
 and an intact journal. See [compatibility and recovery](docs/compatibility.md).
+
+Integrators can select bounded buffered writes or strict per-operation
+durability. Buffered changes are immediately visible to readers; an explicit
+filesystem flush makes the checkpoint durable. Recent unflushed changes may
+be lost after a crash. Both policies use the same recovery protocol. See
+[buffering and integration](docs/transaction-batching.md).
 
 ## Build and test
 

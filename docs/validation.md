@@ -1,5 +1,104 @@
 # Validation boundary
 
+## Buffered engine qualification, 2026-10-21
+
+The default external handler now uses SFS-style buffered writes. Successful
+mutations are immediately visible to readers; durability belongs to the next
+completed filesystem checkpoint. A crash may lose recent unflushed changes.
+Explicit filesystem flush, clean inhibit, buffer pressure and a five-second
+timer request a checkpoint. Strict per-operation durability remains an option.
+Both modes retain the undo journal and four ordered durability barriers; see
+[transaction batching](transaction-batching.md).
+
+The 68020 handler used for this comparison is 101,232 bytes, SHA-256
+`0814AD1296B3D479C6B9B05056ACCF365C7933ECCF83F35EE7D38733F102FF25`.
+Original SmartFilesystem 1.279 is 97,984 bytes, SHA-256
+`C7DD174131035A0F5845BE1076FB5C55642F6AA2125D4B5D8C029B141DCC8205`.
+Both ran under the same Kickstart 3.1 emulator profile: 68020, 512 KiB chip
+RAM, 2 MiB fast RAM, and 32 mount buffers. Each run started from a separate
+byte-for-byte copy of the immutable 16 MiB, 512-byte-block image, SHA-256
+`36119C09B6480AD11A748EA011774F2A4F30E9659C0A9FC03E13FA4747983ED1`.
+The compiler and emulator were pinned; the original handler was remeasured
+with the same updated guest workload as CopperSFS.
+
+All 60 unprofiled trials passed: five per handler for each workload. The table
+shows median guest CPU cycles, excluding boot and image-copy time.
+
+| Workload | Original 1.279 | CopperSFS | CopperSFS / original |
+| --- | ---: | ---: | ---: |
+| Sequential 1 MiB read | 2,539,610 | 2,106,781 | 0.830 |
+| Sequential 1 MiB write | 14,419,871 | 13,759,010 | 0.954 |
+| Small-file creation | 10,346,320 | 10,090,131 | 0.975 |
+| Directory enumeration | 7,840,430 | 6,344,680 | 0.809 |
+| Mixed access | 9,342,580 | 9,350,030 | 1.001 |
+| Repeated 1 MiB read | 2,555,080 | 2,121,220 | 0.830 |
+
+Mixed access is effectively tied; the other medians are lower for CopperSFS.
+The previous strict engine took 103,448,180 cycles and 517 flushes for the
+sequential write. The new buffered default takes 13,759,010 cycles and four
+flushes. This comparison includes the authorized durability-policy change and
+68020 code generation; it is not a claim that strict mode has the same speed.
+The write buffer uses 50,256 bytes at 512-byte blocks, and the optional
+enumeration result cache adds 8,836 bytes.
+
+These are CPU measurements, not physical-device throughput. For sequential
+writes CopperSFS issues 12 sector reads, 2,071 sector writes and 196 write
+requests; original SFS issues no reads, 2,058 sector writes and 132 write
+requests. Both use four flushes. Small-file and mixed-access writes also use
+more device requests in CopperSFS, so real storage latency can change the
+comparison. The repeated-read working set exceeds the cache: both handlers
+still read 2,048 sectors. Large in-place overwrites can use the strict fallback
+and are not covered by the sequential new-file write result.
+
+All 13 native correctness cases passed. Coverage includes two DOS writer
+processes with a parent reader, a separate two-writer/reader shared-file test,
+positions and sizes, clean remounts, both clean handoff directions, directory
+cache invalidation and copied enumeration tokens, metadata, timer-only commit,
+and CopperSFS replay of an original `TRST` transaction. Original 1.279 rejects
+resize with other open handles; that operation has a separate CopperSFS
+regression rather than an assumed common behavior. Independent amidisk checks
+validate structure and agreed file contents.
+
+The complete buffered recovery sweep passed all 160 cut points: 98 for
+CopperSFS and 62 for original SFS, across create, overwrite, truncate, rename
+and delete. Every relevant sector write and flush was tested without sampling.
+Each image was rebooted with its writing handler. CopperSFS recovered either
+the previous checkpoint or the complete new checkpoint; none of these buffered
+create cases retained an intermediate empty file. The original's observed
+results are not a stronger guarantee than its documented behavior. No
+unresolved CopperSFS transaction was handed to the original handler.
+Exact old-or-new byte comparisons are required for CopperSFS. The original's
+checks record structural consistency and guest-observed recovery outcomes;
+its non-new overwrite result alone does not prove exact rollback.
+
+The optional strict handler is 101,020 bytes, SHA-256
+`F9DF60A9104148260AFE7988DC0D698AF7F80EE8121CE82914FE9FBB25710E74`.
+Its unsampled recovery sweep also passed: 112 CopperSFS cut points and another
+62 for original SFS. Strict create may preserve the empty file committed by
+Open before its separate Write packet; this is consistent with per-operation
+durability. Buffered mode instead commits those operations together when they
+fit in one checkpoint.
+Strict mode also passed the concurrent-process, shared-handle, clean-remount
+and two-direction handoff cases. An evidence audit checked all 60 unique
+performance trials, every cut index against complete baseline I/O traces,
+the immutable fixture and handler hashes, and compiled source checksums.
+
+The final core passed 139 host tests in each of Debug and Release. Another 75
+shared filesystem host cases and 45 focused compiled MC68000 cases passed.
+The instruction cases use recording device boundaries and Exec service
+doubles; native AmigaDOS execution is covered separately above. A separate
+68000 extension-ROM write/fresh-boot-read smoke passed and is excluded from
+the performance figures.
+
+The 68000-targeted handler also passed mount and the shared workload on the
+68020 emulator. A separate full Kickstart 3.1 floppy replay on a 68000 profile
+stopped in an emulator display-order assertion before filesystem startup, so
+that full-68000 replay is not qualified by this run. Physical hardware, torn
+sectors, controllers that violate flush ordering, and native TD64/NSD
+partitions above 4 GiB remain outside this qualification.
+
+## Previous strict engine qualification, 2026-10-20
+
 On 2026-10-20 the standalone core's 113 host semantic tests passed in Debug
 and Release configurations. They cover allocation, metadata and directory mutation,
 interleaved reads and writes, injected failures at write and flush points, and
@@ -24,7 +123,7 @@ doubles, and recording device boundaries. Native AmigaDOS and real Exec
 execution are covered separately by the booted tests below; these instruction
 tests do not establish real-device DMA behavior.
 
-The current optimized MC68000 handler passed all 12 native A/B tests against
+The earlier optimized MC68000 handler passed all 12 native A/B tests against
 original SmartFilesystem 1.279 under Kickstart 3.1, using a 68020 emulator
 profile with 512 KiB chip RAM and 2 MiB fast RAM. Each independent workload
 started from its own byte-for-byte copy of the same independently formatted

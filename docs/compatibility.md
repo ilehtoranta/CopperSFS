@@ -13,9 +13,13 @@ expected to interpret `CSUN`. A damaged journal remains dirty rather than
 being silently accepted. The journal reserves free blocks temporarily, so a
 mutation can report a full disk before every free data block is consumed.
 
-An optional bounded staging buffer batches undo publication and target writes
-within each mutation. It retains the same on-disk journal and operation commit
-boundary, including when an operation exceeds the buffer capacity. See
+An optional bounded write buffer groups successful mutations into a checkpoint.
+Readers see pending changes immediately; a crash can lose changes since the
+last successful filesystem flush. A failed operation rolls back its own RAM
+changes without discarding earlier successful operations. Leaving
+`Work.Buffered` null selects strict per-operation durability, optionally using
+a separate staging buffer within each mutation. Both policies retain the same
+on-disk undo journal and recovery barriers. See
 [transaction batching](transaction-batching.md) for the durability ordering and
 the platform's read-through contract.
 

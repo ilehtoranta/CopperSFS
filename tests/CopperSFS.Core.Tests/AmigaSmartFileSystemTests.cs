@@ -14,17 +14,34 @@ public sealed partial class AmigaSmartFileSystemTests
 
     private struct Disk(byte[] image) : IAmigaWritableFileSystemPlatform
     {
-        public readonly byte[] Ram = new byte[32768];
+        public readonly byte[] Ram = new byte[131072];
         public int Writes, FailAtWrite, IoEvents, CutAfterIo, Flushes, FailAtFlush;
         public APTR Batch;
+        public APTR WriteBack;
         public bool Buffered;
         public bool RequireAlignedBlockBuffers;
+        public uint FailReadBlock = uint.MaxValue;
+        public readonly List<(uint Block, uint Count)> DataReads = [];
+        public readonly List<(uint Block, uint Count)> DataWrites = [];
         private Dictionary<uint, byte[]>? pending;
         public AmigaVolumeGeometry Geometry { get { AmigaVolumeGeometry.Create(Blocks, Bytes, 1, out var geometry); return geometry; } }
+        // One reusable cache slot deliberately expires the previous view on
+        // every lookup, exercising the platform's minimum lifetime contract.
+        public APTR ReadMetadataView(uint block, uint id, APTR scratch)
+        {
+            var view = APTR.FromPointer(125000);
+            return ReadMetadataBlock(block, id, view) ? view : APTR.Null;
+        }
+        public bool ReadMetadataBlock(uint block, uint id, APTR target) => AmigaFileSystemBlockIo.ReadMetadata(ref this, block, id, target);
+        public uint ReadDataBlocks(uint block, uint count, APTR target)
+        { DataReads.Add((block, count)); return AmigaFileSystemBlockIo.Read(ref this, block, count, target); }
         public bool ReadBlock(uint block, APTR destination)
         {
             if (RequireAlignedBlockBuffers) Assert.Equal(0u, destination.Raw & 3);
-            if (block >= Blocks || !IsMapped(destination, Bytes)) return false;
+            if (block == FailReadBlock || block >= Blocks || !IsMapped(destination, Bytes)) return false;
+            if (!AmigaSmartFileSystemWriteBuffer.TryRead(ref this, WriteBack, Bytes,
+                block, destination, 0, out var dirty)) return false;
+            if (dirty) return true;
             if (!AmigaSmartFileSystemTransactionBuffer.TryRead(ref this, Batch, Bytes,
                 block, destination, out var staged)) return false;
             if (staged) return true;
@@ -48,6 +65,8 @@ public sealed partial class AmigaSmartFileSystemTests
             if (CutAfterIo != 0 && IoEvents == CutAfterIo) throw new PowerCut();
             return true;
         }
+        public bool WriteDataBlocks(uint block, uint count, APTR source)
+        { DataWrites.Add((block, count)); return AmigaFileSystemBlockIo.Write(ref this, block, count, source); }
         public bool WriteBlock(uint block, APTR source)
         {
             if (RequireAlignedBlockBuffers) Assert.Equal(0u, source.Raw & 3);
@@ -98,6 +117,9 @@ public sealed partial class AmigaSmartFileSystemTests
         {
             get { AmigaVolumeGeometry.Create(LargeBlocks, Bytes, 1, out var geometry); return geometry; }
         }
+        public APTR ReadMetadataView(uint block, uint id, APTR scratch) => ReadMetadataBlock(block, id, scratch) ? scratch : APTR.Null;
+        public bool ReadMetadataBlock(uint block, uint id, APTR target) => AmigaFileSystemBlockIo.ReadMetadata(ref this, block, id, target);
+        public uint ReadDataBlocks(uint block, uint count, APTR target) => AmigaFileSystemBlockIo.Read(ref this, block, count, target);
         public bool ReadBlock(uint block, APTR destination)
         {
             if (block >= LargeBlocks || !IsMapped(destination, Bytes)) return false;
@@ -106,6 +128,7 @@ public sealed partial class AmigaSmartFileSystemTests
             else target.Clear();
             return true;
         }
+        public bool WriteDataBlocks(uint block, uint count, APTR source) => AmigaFileSystemBlockIo.Write(ref this, block, count, source);
         public bool WriteBlock(uint block, APTR source)
         {
             if (block < Geometry.ReservedBlocks || block >= LargeBlocks - 1 || !IsMapped(source, Bytes)) return false;

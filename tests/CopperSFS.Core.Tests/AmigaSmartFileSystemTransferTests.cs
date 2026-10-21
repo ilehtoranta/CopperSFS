@@ -5,6 +5,50 @@ namespace CopperSFS.Tests;
 
 public sealed partial class AmigaSmartFileSystemTests
 {
+    [Fact]
+    public void BulkReadReportsOnlyTheCompletedPrefixAfterADeviceFailure()
+    {
+        var disk = new Disk(Image()) { FailReadBlock = 21 };
+        Array.Fill(disk.Ram, (byte)0xA7);
+        var cursor = new AmigaSmartFileSystemCore.ReadCursor();
+        Assert.Equal(512, AmigaSmartFileSystemCore.Read(ref disk, ref cursor, 3, 0,
+            APTR.FromPointer(4000), 1300, APTR.FromPointer(512), APTR.FromPointer(1024), out var error));
+        Assert.Equal(DOS.Error.DiskNotValidated, error);
+        Assert.Equal(0u, cursor.Node);
+        Assert.Equal(new[] { (20u, 2u) }, disk.DataReads);
+        for (var index = 0; index < 1300; index++)
+            Assert.Equal(index < 512 ? (byte)(index * 17) : (byte)0xA7, disk.Ram[4000 + index]);
+    }
+
+    [Fact]
+    public void ReadCursorsSupportInterleavedHandlesBackwardSeeksAndMutationInvalidation()
+    {
+        var disk = new Disk(Image()) { Buffered = true };
+        var first = new AmigaSmartFileSystemCore.ReadCursor();
+        var second = new AmigaSmartFileSystemCore.ReadCursor();
+        var metadata = APTR.FromPointer(512); var data = APTR.FromPointer(1024);
+        foreach (var position in new uint[] { 0, 512, 1024, 3, 700, 1300 })
+        {
+            var count = Math.Min(300u, 1300 - position);
+            Assert.Equal((int)count, AmigaSmartFileSystemCore.Read(ref disk, ref first, 3, position,
+                APTR.FromPointer(4000), count, metadata, data, out var error));
+            Assert.Equal(DOS.Error.None, error);
+            for (var i = 0u; i < count; i++) Assert.Equal((byte)((position + i) * 17), disk.Ram[4000 + i]);
+            Assert.Equal(100, AmigaSmartFileSystemCore.Read(ref disk, ref second, 3, 800,
+                APTR.FromPointer(5000), 100, metadata, data, out error));
+            Assert.Equal(DOS.Error.None, error);
+        }
+        var work = BatchWork(ref disk);
+        Assert.True(AmigaSmartFileSystemWriteCore.Resize(ref disk, ref work, 3, 600));
+        first.Node = second.Node = 0; // The owner invalidates all handles after mutation.
+        Assert.Equal(88, AmigaSmartFileSystemCore.Read(ref disk, ref first, 3, 512,
+            APTR.FromPointer(4000), 300, metadata, data, out var result));
+        Assert.Equal(DOS.Error.None, result);
+        Assert.Equal(-1, AmigaSmartFileSystemCore.Read(ref disk, ref second, 3, 800,
+            APTR.FromPointer(5000), 100, metadata, data, out result));
+        Assert.Equal(DOS.Error.SeekError, result);
+    }
+
     [Theory]
     [InlineData(0u)]
     [InlineData(1u)]
