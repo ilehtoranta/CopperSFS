@@ -4,7 +4,8 @@ namespace CopperSFS;
 
 /// <summary>
 /// Caller-owned staging for one SFS undo transaction. ReadBlock must consult
-/// this buffer before physical storage; WriteBlock must always write through.
+/// this buffer before physical storage; WriteBlock must always bypass staging
+/// (a separate physical queue may combine writes within a flush interval).
 /// The writer publishes durable undo records before draining staged blocks.
 /// </summary>
 public static class AmigaSmartFileSystemTransactionBuffer

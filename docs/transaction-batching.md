@@ -92,3 +92,39 @@ successful mutation is durable when its final flush
 completes. The guarantees assume atomic block writes and a device that honors
 flush barriers; torn sectors and a controller that violates flush ordering
 are outside this model.
+
+## Combining physical writes
+
+`AmigaFileSystemWriteCombiner` provides optional caller-owned storage beneath
+both durability policies. It owns up to 128 block images, replaces repeated
+writes by block number, and drains physically adjacent blocks as contiguous
+device requests. It never fills gaps or combines across a flush barrier.
+New data, undo images and chain links can share requests before the first
+barrier. Dirty markers, home blocks and clean markers remain separated by
+the existing four barriers. The on-disk journal format is unchanged.
+
+The platform must consult logical buffered writes, strict staging, then this
+queue before reading physical storage. Capacity pressure drains writes without
+adding a flush. Every platform Flush must drain the queue successfully before
+issuing the device flush. A failed or partially completed drain retains all
+images, including the completed prefix: live recovery can replace queued home
+blocks with undo images, then retry. Discarding the queue on an I/O error would
+lose acknowledged data. Destruction after a crash must not implicitly flush it.
+
+At 512 bytes per block, a 128-block queue requires 133,920 bytes, including scratch
+space for gathering adjacent blocks that arrived out of order. Initialization
+and all operations are allocation-free. Embedders may omit it when memory is
+scarce; their durability contract remains the same. The device layer must still
+honor its DMA memory requirements, alignment, maximum transfer size and large
+device offsets when draining a run.
+
+The native handler limits bulk-data copying to half a queue per barrier
+interval (32 KiB at 512-byte blocks). Later streaming writes can use their
+caller buffers directly; overlapping queued ranges still replace the queued
+images. Small writes remain eligible for combination with the journal. A
+verified metadata image keeps its checksum result only until it is replaced.
+The native read cache retains mount/recovery reads and can fetch an eight-block
+window when its memory and transfer limit allow one request. It skips pending
+writes when filling that cache and retries the requested block alone if
+speculative neighbors fail. An already clean device needs no redundant flush;
+a failed device flush remains pending even after the write queue has drained.

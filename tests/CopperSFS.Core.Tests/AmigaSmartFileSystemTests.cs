@@ -14,10 +14,12 @@ public sealed partial class AmigaSmartFileSystemTests
 
     private struct Disk(byte[] image) : IAmigaWritableFileSystemPlatform
     {
-        public readonly byte[] Ram = new byte[131072];
+        public readonly byte[] Ram = new byte[524288];
         public int Writes, FailAtWrite, IoEvents, CutAfterIo, Flushes, FailAtFlush;
         public APTR Batch;
         public APTR WriteBack;
+        public APTR WriteQueue;
+        public readonly List<(uint Block, uint Count)> PhysicalWrites = [];
         public bool Buffered;
         public bool RequireAlignedBlockBuffers;
         public uint FailReadBlock = uint.MaxValue;
@@ -45,6 +47,8 @@ public sealed partial class AmigaSmartFileSystemTests
             if (!AmigaSmartFileSystemTransactionBuffer.TryRead(ref this, Batch, Bytes,
                 block, destination, out var staged)) return false;
             if (staged) return true;
+            var queued = AmigaFileSystemWriteCombiner.ReadView(ref this, WriteQueue, block);
+            if (queued.IsNotNull) { Copy(queued, destination, Bytes); return true; }
             if (Buffered && pending is not null && pending.TryGetValue(block, out var volatileBlock))
                 volatileBlock.CopyTo(Ram, (int)destination.Raw);
             else image.AsSpan((int)block * Bytes, Bytes).CopyTo(Ram.AsSpan((int)destination.Raw, Bytes));
@@ -53,6 +57,7 @@ public sealed partial class AmigaSmartFileSystemTests
         public bool WriteProtected() => false;
         public bool Flush()
         {
+            if (!DrainWrites()) return false;
             Flushes++;
             if (FailAtFlush != 0 && Flushes >= FailAtFlush) return false;
             if (Buffered && pending is not null)
@@ -68,6 +73,27 @@ public sealed partial class AmigaSmartFileSystemTests
         public bool WriteDataBlocks(uint block, uint count, APTR source)
         { DataWrites.Add((block, count)); return AmigaFileSystemBlockIo.Write(ref this, block, count, source); }
         public bool WriteBlock(uint block, APTR source)
+        {
+            if (WriteQueue.IsNull) return RawWriteBlock(block, source);
+            return AmigaFileSystemWriteCombiner.TryStore(ref this, WriteQueue, block, 1, source) ||
+                (DrainWrites() && AmigaFileSystemWriteCombiner.TryStore(ref this, WriteQueue, block, 1, source));
+        }
+        public bool DrainWrites()
+        {
+            var used = AmigaFileSystemWriteCombiner.Count(ref this, WriteQueue);
+            if (used == 0) return true;
+            AmigaFileSystemWriteCombiner.Sort(ref this, WriteQueue);
+            for (var ordinal = 0u; ordinal < used;)
+            {
+                var data = AmigaFileSystemWriteCombiner.Run(ref this, WriteQueue, ordinal, out var block, out var count);
+                PhysicalWrites.Add((block, count));
+                for (var i = 0u; i < count; i++) if (!RawWriteBlock(block + i, APTR.FromPointer(data.Raw + i * Bytes))) return false;
+                ordinal += count;
+            }
+            AmigaFileSystemWriteCombiner.Discard(ref this, WriteQueue);
+            return true;
+        }
+        private bool RawWriteBlock(uint block, APTR source)
         {
             if (RequireAlignedBlockBuffers) Assert.Equal(0u, source.Raw & 3);
             Writes++;

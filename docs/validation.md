@@ -1,6 +1,128 @@
 # Validation boundary
 
-## Buffered engine qualification, 2026-10-21
+## Adjacent-write qualification, 2026-10-22
+
+The native handler now combines physically adjacent writes within each commit
+phase, preserving the existing four durability barriers and undo format.
+The optional queue retains owned images across partial I/O failures, allowing
+recovery to replace target images with undo images and retry. It never combines
+across a flush barrier. Buffered writes remain the default and strict
+per-operation durability remains available; see
+[transaction batching](transaction-batching.md).
+
+The queue adds 133,920 optional bytes per mounted volume at 512-byte blocks.
+Bulk-data copying is limited to 32 KiB per barrier interval, after which
+streaming writes can use the caller's buffer directly. The read cache retains
+mount/recovery reads, fetches small adjacent windows and excludes pending
+writes from prefill. A failed speculative read retries the requested block
+alone. Redundant flushes on an already clean device are omitted; failed flushes
+remain pending. The fallback without queue memory retains the durability policy.
+
+The compared buffered 68020 handler is 104,952 bytes, SHA-256
+`226489F245A86FFE8D94D7AB8D7E29A62AAA720A1B2A6CB40CA4FBAA1ABCD749`.
+Original SmartFilesystem 1.279 is 97,984 bytes, SHA-256
+`C7DD174131035A0F5845BE1076FB5C55642F6AA2125D4B5D8C029B141DCC8205`.
+Each trial began with its own byte-for-byte clone of the same 16 MiB,
+512-byte-block image, SHA-256
+`36119C09B6480AD11A748EA011774F2A4F30E9659C0A9FC03E13FA4747983ED1`.
+Both handlers used Kickstart 3.1, a 68020, 512 KiB chip RAM, 2 MiB fast RAM,
+32 mount buffers, Mask `0x7FFFFFFF` and MaxTransfer `0x1FE00`. Geometry was
+two surfaces, 32 blocks per track, cylinders 0–511, two reserved blocks and
+start offset zero. The compiler and emulator were pinned. Independent checks
+used amidisk revision `a4faa7b36bd7c005371d9bb509a936a13d58b43f`.
+
+All 60 unprofiled benchmark trials passed. Every corresponding trial matched
+or beat the original's measured read/write/flush request total. Other device
+control commands are outside this count. Five-trial medians are:
+
+| Workload | Original write requests | CopperSFS write requests | Original total requests | CopperSFS total requests |
+| --- | ---: | ---: | ---: | ---: |
+| Sequential 1 MiB write | 132 | 131 | 136 | 136 |
+| Small-file creation | 9 | 9 | 17 | 15 |
+| Mixed access | 8 | 8 | 15 | 13 |
+
+The previous CopperSFS build issued 196, 70 and 36 write requests respectively.
+Both handlers now use four flushes in each write workload. Sequential and
+repeated reads use 128 read requests and zero flushes; enumeration uses zero
+measured requests for both handlers.
+
+| Workload | Original CPU cycles | CopperSFS CPU cycles | CopperSFS / original |
+| --- | ---: | ---: | ---: |
+| Sequential 1 MiB read | 2,539,610 | 2,185,050 | 0.860 |
+| Sequential 1 MiB write | 14,420,000 | 15,058,870 | 1.044 |
+| Small-file creation | 10,373,880 | 10,857,750 | 1.047 |
+| Directory enumeration | 7,825,441 | 6,468,870 | 0.827 |
+| Mixed access | 9,332,230 | 9,861,690 | 1.057 |
+| Repeated 1 MiB read | 2,555,030 | 2,130,271 | 0.834 |
+
+The request savings add CPU work: write medians are 4.4–5.7% above original SFS
+and above the preceding CopperSFS build. Read and enumeration medians remain
+14–17% below the original. Boot and image-copy time are excluded. These are
+guest CPU/request measurements, not physical-device throughput. CopperSFS
+still writes more sectors for sequential writes (2,071 versus 2,058) and
+small-file creation (70 versus 56); mixed access writes 36 for both handlers.
+Its corresponding sector reads are 8/16/8, versus 0/64/48 for the original.
+The repeated-read working set exceeds both caches and still reads 2,048 sectors.
+Large in-place overwrites can use the strict fallback, so this result does
+not establish parity for every workload or memory configuration.
+
+All 13 buffered native correctness cases passed, including concurrent writer
+processes and a reader, shared handles, positions and sizes, clean remounts,
+both clean handoff directions, metadata, enumeration invalidation, timer-only
+commits and replay of an original `TRST` transaction. File contents and
+structure passed independent amidisk extraction and deep checks.
+
+Both complete, unsampled recovery sweeps passed all 329 cut-and-reboot cases:
+98 buffered CopperSFS cuts, 107 strict CopperSFS cuts, and the original's
+62-cut sweep repeated for each mode. Every relevant sector write and flush
+was covered, including individual sectors inside combined requests.
+
+| Operation | Buffered CopperSFS cuts | Strict CopperSFS cuts | Original cuts per sweep |
+| --- | ---: | ---: | ---: |
+| Create | 26 | 35 | 15 |
+| Overwrite | 15 | 15 | 9 |
+| Truncate | 18 | 18 | 12 |
+| Rename | 15 | 15 | 11 |
+| Delete | 24 | 24 | 15 |
+
+CopperSFS recovered exact old-or-new bytes. Strict create may retain the empty
+file committed by Open before its separate Write; buffered create recovered
+either an absent file or the complete new file. Removing a redundant
+clean-device flush accounts for one fewer strict cut per operation than the
+preceding run. Every cut index was checked against a complete baseline trace.
+Original SFS's recorded outcomes remain observations of its own guarantees;
+its non-new overwrite outcome alone does not prove exact rollback. No unresolved
+`CSUN` transaction was handed to the original. There were no failed cases.
+
+The strict 68020 handler is 104,728 bytes, SHA-256
+`3C6A781F89C4D587B544C1BFF2101A1D3D4E33F06C2B47A0780E80052CE5EE19`.
+All five strict native cases passed: recovery, concurrent processes, shared
+handles, correctness/remount and clean handoff in both directions. Strict
+performance is outside the table above. The buffered 68000 handler is
+106,728 bytes, SHA-256
+`12AE8BA4D4E47FE3E3BB996F775C573F7110D4E356F85191ABD19423E5F6CECC`;
+it passed mount and the shared workload on the 68020 profile.
+
+The core passed 154 host tests in each of Debug and Release. Another 75 shared
+filesystem host cases and 54 focused compiled MC68000 cases passed. New tests
+cover queue ownership, adjacent/disjoint runs, full queues, arbitrary pending
+sector subsets, failed writes/flushes and retry, partial completions, DMA and
+transfer limits, and cache coherence. Instruction tests use recording devices
+and Exec service doubles. A separate 68000 extension-ROM write/fresh-boot-read
+smoke passed and is excluded from the handler benchmark. The evidence audit
+verified every recovery cut, all 60 unique trials, fixture and handler hashes,
+compiled source checksums and identical rebuilt handler binaries.
+
+The crash model assumes atomic 512-byte sectors and honored flush barriers;
+pending device writes are lost at a cut and normal shutdown flushing is disabled.
+Host tests additionally exercise subsets of pending writes and live I/O errors.
+Physical hardware, torn sectors, controllers that violate flush ordering and
+native partitions above 4 GiB remain unqualified. Full 68000 Kickstart floppy
+replay remains unavailable after the preceding round's pre-filesystem emulator
+assertion; it was not repeated in this round. This source qualification does
+not update the published preview package.
+
+## Previous buffered engine qualification, 2026-10-21
 
 The default external handler now uses SFS-style buffered writes. Successful
 mutations are immediately visible to readers; durability belongs to the next

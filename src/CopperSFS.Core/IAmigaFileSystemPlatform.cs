@@ -22,9 +22,15 @@ public interface IAmigaFileSystemPlatform : IAmigaGuestMemory
 public interface IAmigaWritableFileSystemPlatform : IAmigaFileSystemPlatform
 {
     bool WriteProtected();
+    /// <summary>Accept an owned copy outside the logical transaction overlays.
+    /// An optional physical queue must provide read-your-writes and drain before
+    /// Flush; writes from different flush intervals must never be combined.</summary>
     bool WriteBlock(uint block, APTR source);
-    /// <summary>Write consecutive newly allocated data blocks through to the device.
-    /// Does not flush, stage metadata, or replace the journal for existing data.</summary>
+    /// <summary>Accept consecutive newly allocated data blocks using the same
+    /// physical queue contract as WriteBlock. Does not flush, stage metadata,
+    /// or replace the journal for existing data.</summary>
     bool WriteDataBlocks(uint block, uint count, APTR source);
+    /// <summary>Drain all accepted physical writes, then flush the device.
+    /// Return false if either step fails; retain queued images on a failed drain.</summary>
     bool Flush();
 }
