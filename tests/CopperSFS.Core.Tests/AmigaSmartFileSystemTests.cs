@@ -16,29 +16,43 @@ public sealed partial class AmigaSmartFileSystemTests
     {
         public readonly byte[] Ram = new byte[524288];
         public int Writes, FailAtWrite, IoEvents, CutAfterIo, Flushes, FailAtFlush;
+        public int GeometryReads;
         public APTR Batch;
         public APTR WriteBack;
         public APTR WriteQueue;
         public readonly List<(uint Block, uint Count)> PhysicalWrites = [];
         public bool Buffered;
         public bool RequireAlignedBlockBuffers;
+        public bool CheckReadOnlyViews;
+        private byte[]? readOnlyView;
         public uint FailReadBlock = uint.MaxValue;
         public readonly List<(uint Block, uint Count)> DataReads = [];
         public readonly List<(uint Block, uint Count)> DataWrites = [];
         private Dictionary<uint, byte[]>? pending;
-        public AmigaVolumeGeometry Geometry { get { AmigaVolumeGeometry.Create(Blocks, Bytes, 1, out var geometry); return geometry; } }
+        public uint BlockCount => Blocks;
+        public uint BlockBytes => Bytes;
+        public uint ReservedBlocks => 1;
+        public AmigaVolumeGeometry Geometry { get { GeometryReads++; AmigaVolumeGeometry.Create(Blocks, Bytes, 1, out var geometry); return geometry; } }
         // One reusable cache slot deliberately expires the previous view on
         // every lookup, exercising the platform's minimum lifetime contract.
         public APTR ReadMetadataView(uint block, uint id, APTR scratch)
         {
             var view = APTR.FromPointer(125000);
-            return ReadMetadataBlock(block, id, view) ? view : APTR.Null;
+            if (!ReadMetadataBlock(block, id, view)) return APTR.Null;
+            if (CheckReadOnlyViews) readOnlyView = Ram.AsSpan((int)view.Raw, Bytes).ToArray();
+            return view;
+        }
+        private void CheckView()
+        {
+            if (readOnlyView is not null) Assert.Equal(readOnlyView, Ram.AsSpan(125000, Bytes).ToArray());
+            readOnlyView = null;
         }
         public bool ReadMetadataBlock(uint block, uint id, APTR target) => AmigaFileSystemBlockIo.ReadMetadata(ref this, block, id, target);
         public uint ReadDataBlocks(uint block, uint count, APTR target)
         { DataReads.Add((block, count)); return AmigaFileSystemBlockIo.Read(ref this, block, count, target); }
         public bool ReadBlock(uint block, APTR destination)
         {
+            CheckView();
             if (RequireAlignedBlockBuffers) Assert.Equal(0u, destination.Raw & 3);
             if (block == FailReadBlock || block >= Blocks || !IsMapped(destination, Bytes)) return false;
             if (!AmigaSmartFileSystemWriteBuffer.TryRead(ref this, WriteBack, Bytes,
@@ -74,6 +88,7 @@ public sealed partial class AmigaSmartFileSystemTests
         { DataWrites.Add((block, count)); return AmigaFileSystemBlockIo.Write(ref this, block, count, source); }
         public bool WriteBlock(uint block, APTR source)
         {
+            CheckView();
             if (WriteQueue.IsNull) return RawWriteBlock(block, source);
             return AmigaFileSystemWriteCombiner.TryStore(ref this, WriteQueue, block, 1, source) ||
                 (DrainWrites() && AmigaFileSystemWriteCombiner.TryStore(ref this, WriteQueue, block, 1, source));
@@ -98,7 +113,7 @@ public sealed partial class AmigaSmartFileSystemTests
             if (RequireAlignedBlockBuffers) Assert.Equal(0u, source.Raw & 3);
             Writes++;
             if (FailAtWrite != 0 && Writes >= FailAtWrite) return false;
-            if (block < Geometry.ReservedBlocks || block >= Blocks || !IsMapped(source, Bytes)) return false;
+            if (block < ReservedBlocks || block >= Blocks || !IsMapped(source, Bytes)) return false;
             if (Buffered) (pending ??= new())[block] = Ram.AsSpan((int)source.Raw, Bytes).ToArray();
             else Ram.AsSpan((int)source.Raw, Bytes).CopyTo(image.AsSpan((int)block * Bytes, Bytes));
             IoEvents++;
@@ -139,6 +154,9 @@ public sealed partial class AmigaSmartFileSystemTests
     {
         public readonly byte[] Ram = new byte[8192];
         public uint CutAfterBlock;
+        public uint BlockCount => Geometry.BlockCount;
+        public uint BlockBytes => Geometry.BlockBytes;
+        public uint ReservedBlocks => Geometry.ReservedBlocks;
         public AmigaVolumeGeometry Geometry
         {
             get { AmigaVolumeGeometry.Create(LargeBlocks, Bytes, 1, out var geometry); return geometry; }

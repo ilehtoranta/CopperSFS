@@ -8,9 +8,9 @@ public static class AmigaFileSystemBlockIo
     public static bool ReadMetadata<T>(ref T p, uint block, uint id, APTR destination)
         where T : struct, IAmigaFileSystemPlatform
     {
-        var geometry = p.Geometry;
-        return block < geometry.BlockCount && p.ReadBlock(block, destination) &&
-            ValidateMetadata(ref p, block, id, destination, geometry.BlockBytes);
+        var bytes = p.BlockBytes;
+        return block < p.BlockCount && p.ReadBlock(block, destination) &&
+            ValidateMetadata(ref p, block, id, destination, bytes);
     }
 
     public static bool ValidateMetadata<T>(ref T p, uint block, uint id, APTR data, uint bytes)
@@ -21,25 +21,25 @@ public static class AmigaFileSystemBlockIo
     public static uint Read<T>(ref T p, uint block, uint count, APTR destination)
         where T : struct, IAmigaFileSystemPlatform
     {
-        var geometry = p.Geometry;
-        if (!Range(geometry, block, count, destination)) return 0;
+        var bytes = p.BlockBytes;
+        if (!Range(p.BlockCount, bytes, block, count, destination)) return 0;
         var completed = 0u;
         while (completed < count && p.ReadBlock(block + completed,
-            APTR.FromPointer(destination.Raw + completed * geometry.BlockBytes))) completed++;
+            APTR.FromPointer(destination.Raw + completed * bytes))) completed++;
         return completed;
     }
 
     public static bool Write<T>(ref T p, uint block, uint count, APTR source)
         where T : struct, IAmigaWritableFileSystemPlatform
     {
-        var geometry = p.Geometry;
-        if (block < geometry.ReservedBlocks || !Range(geometry, block, count, source)) return false;
+        var bytes = p.BlockBytes;
+        if (block < p.ReservedBlocks || !Range(p.BlockCount, bytes, block, count, source)) return false;
         for (var index = 0u; index < count; index++)
-            if (!p.WriteBlock(block + index, APTR.FromPointer(source.Raw + index * geometry.BlockBytes))) return false;
+            if (!p.WriteBlock(block + index, APTR.FromPointer(source.Raw + index * bytes))) return false;
         return true;
     }
 
-    private static bool Range(AmigaVolumeGeometry geometry, uint block, uint count, APTR buffer)
-        => geometry.BlockBytes != 0 && block < geometry.BlockCount && count <= geometry.BlockCount - block &&
-           count <= (uint.MaxValue - buffer.Raw) / geometry.BlockBytes;
+    private static bool Range(uint blockCount, uint bytes, uint block, uint count, APTR buffer)
+        => bytes != 0 && block < blockCount && count <= blockCount - block &&
+           count <= (uint.MaxValue - buffer.Raw) / bytes;
 }

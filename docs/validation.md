@@ -1,6 +1,137 @@
 # Validation boundary
 
-## Adjacent-write qualification, 2026-10-22
+## Compact queue and write CPU qualification, 2026-10-22
+
+The buffered handler now uses fewer guest CPU cycles than original SFS in all
+six measured workloads. The three write workloads also retain exactly the
+previous build's sector, device-request and flush counts. The physical queue
+has the same 128-block capacity while using 69,408 bytes instead of 133,920:
+64,512 bytes (48.2%) less per mounted volume at 512-byte blocks. The logical
+write buffer and other cache allocations are unchanged.
+
+Sorting now permutes the owned block images in place using one scratch block
+and an inverse slot map. Adjacent runs transfer directly from those images.
+The queue retains every image after partial transfers and supports replacement,
+further insertion and another sort before retry. Commit phases, four durability
+barriers, the undo format and the buffered/strict durability policies are
+unchanged. See [transaction batching](transaction-batching.md).
+
+CPU work was reduced by reusing an extent record location within the operation
+that validated it, publishing edited buffered images directly, using scalar
+geometry access, shifting B-tree records with aligned backward copies, and
+limiting small cache invalidations to their hash buckets.
+The native adapter reads buffered metadata directly while preserving hidden
+recovery views, checksum verification and tag invalidation. Borrowed bitmap
+views remain read-only until their checkpoint image has been captured.
+
+The qualified handlers are:
+
+| Variant | Bytes | SHA-256 |
+| --- | ---: | --- |
+| Buffered 68020 | 104,568 | `24E56660A6251D4EB267983CF547351FA37376FBD6178534FAA563AE799593CE` |
+| Strict 68020 | 104,360 | `B3AA61500E078A3B9BBB66860F7243E982C6913B499ADE6E7819076256751CA8` |
+| Buffered 68000 | 106,304 | `9EC8FD11FB01153853A8D857873439A367D4D7205463E6EB17BCD34ED9B91563` |
+
+The buffered 68020 handler is 384 bytes smaller than the preceding build and
+6,584 bytes larger than original SmartFilesystem 1.279 (97,984 bytes).
+Original handler SHA-256 is
+`C7DD174131035A0F5845BE1076FB5C55642F6AA2125D4B5D8C029B141DCC8205`.
+Every independent run began with a fresh byte-for-byte clone of the same
+16 MiB, 512-byte-block image, SHA-256
+`36119C09B6480AD11A748EA011774F2A4F30E9659C0A9FC03E13FA4747983ED1`.
+Both handlers used Kickstart 3.1, a 68020, 512 KiB chip RAM, 2 MiB fast RAM,
+32 mount buffers, Mask `0x7FFFFFFF` and MaxTransfer `0x1FE00`. Geometry was
+two surfaces, 32 blocks per track, cylinders 0–511, two reserved blocks and
+start offset zero. The compiler and emulator were pinned. Independent checks
+used amidisk revision `a4faa7b36bd7c005371d9bb509a936a13d58b43f`.
+
+All 60 unprofiled trials passed, with five fresh-image trials per handler and
+workload. The shared correctness/remount gate passed before benchmarking.
+The following are medians; the previous CopperSFS column is the preceding
+adjacent-write qualification on this same fixture and profile.
+
+| Workload | Original cycles | Previous CopperSFS cycles | Current CopperSFS cycles | Fewer cycles than original |
+| --- | ---: | ---: | ---: | ---: |
+| Sequential 1 MiB read | 2,539,469 | 2,185,050 | 2,129,610 | 16.1% |
+| Sequential 1 MiB write | 14,420,000 | 15,058,870 | 13,563,520 | 5.9% |
+| Small-file creation | 10,346,320 | 10,857,750 | 10,083,470 | 2.5% |
+| Directory enumeration | 7,825,501 | 6,468,870 | 6,236,461 | 20.3% |
+| Mixed access | 9,331,960 | 9,861,690 | 9,190,281 | 1.5% |
+| Repeated 1 MiB read | 2,554,810 | 2,130,271 | 2,146,900 | 16.0% |
+
+Read/write/flush counts below were identical in all five trials of each
+handler/workload pair. Every individual CopperSFS read-request, write-request
+and flush count matches the preceding build. Corresponding total requests
+match or beat original SFS. Other device control commands are excluded.
+
+| Workload | Original requests R/W/F | CopperSFS requests R/W/F | Original sectors R/W | CopperSFS sectors R/W |
+| --- | ---: | ---: | ---: | ---: |
+| Sequential 1 MiB read | 128 / 0 / 0 | 128 / 0 / 0 | 2,048 / 0 | 2,048 / 0 |
+| Sequential 1 MiB write | 0 / 132 / 4 | 1 / 131 / 4 | 0 / 2,058 | 8 / 2,071 |
+| Small-file creation | 4 / 9 / 4 | 2 / 9 / 4 | 64 / 56 | 16 / 70 |
+| Directory enumeration | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 0 | 0 / 0 |
+| Mixed access | 3 / 8 / 4 | 1 / 8 / 4 | 48 / 36 | 8 / 36 |
+| Repeated 1 MiB read | 128 / 0 / 0 | 128 / 0 / 0 | 2,048 / 0 | 2,048 / 0 |
+
+Boot and image-copy time are excluded. These are guest CPU and I/O counts,
+not physical-device throughput. The repeated-read working set exceeds both
+caches and still reads 2,048 sectors; it does not establish a fully cached read
+result. CopperSFS still writes 13 additional sectors for the sequential write
+and 14 for small-file creation. Large in-place overwrites can use the strict
+fallback, and strict performance is outside these tables. These results do not
+establish parity for every workload, device or memory configuration.
+
+All 13 buffered native correctness cases passed, including concurrent writer
+processes and a reader, shared handles and file positions/sizes, clean remounts,
+both clean handoff directions, metadata, directory mutation, timer-only commits
+and one-direction replay of an original `TRST` transaction. All five strict
+native cases passed: recovery, concurrent processes, shared handles, the shared
+workload/remount and both clean handoff directions. AmigaDOS checks and
+independent amidisk extraction/deep checks passed.
+
+Both unsampled recovery sweeps passed all 329 cut-and-reboot cases, with no
+failed case or disk-operation index. The original sweep was repeated for each
+mode. Every relevant sector write and flush was covered, including individual
+sectors within combined device requests, and each image was recovered by its
+writing handler.
+
+| Operation | Buffered CopperSFS cuts | Strict CopperSFS cuts | Original cuts per sweep |
+| --- | ---: | ---: | ---: |
+| Create | 26 | 35 | 15 |
+| Overwrite | 15 | 15 | 9 |
+| Truncate | 18 | 18 | 12 |
+| Rename | 15 | 15 | 11 |
+| Delete | 24 | 24 | 15 |
+
+CopperSFS recovered exact old-or-new bytes. Buffered create produced 25 absent
+and one complete file; strict create also permits the independently committed
+empty file between Open and Write (14 absent, 20 empty, one complete).
+The original's outcomes remain observations of its own guarantees; its non-new
+overwrite result does not alone prove exact rollback. No unresolved `CSUN`
+transaction was handed to original SFS.
+
+The core passed 163 host tests in each of Debug and Release. Another 75 shared
+filesystem host cases and 59 focused compiled MC68000 cases passed. Added
+coverage exercises payload permutation at multiple capacities/block sizes,
+replacement and reordering after partial transfers, read-only bitmap views,
+scalar geometry access, cache hash collisions, invalidated checksum tags and
+hidden buffered images during recovery. Instruction tests use recording
+devices and Exec service doubles; native AmigaDOS execution is separate.
+The 68000 HUNK passed mount and the shared workload on the 68020 profile.
+A separate 68000 extension-ROM write/fresh-boot-read smoke passed and is
+excluded from the performance comparison. The source audit verified 14
+handler/test snapshots against the current compiled source files.
+
+The crash model assumes atomic 512-byte sectors and honored flush barriers;
+pending device writes are lost at a cut and normal shutdown flushing is
+disabled. Host tests additionally exercise subsets of pending writes and live
+I/O errors. Physical hardware, torn sectors, controllers that violate flush
+ordering and native partitions above 4 GiB remain unqualified. Full 68000
+Kickstart floppy replay remains unqualified after the preceding round's
+pre-filesystem emulator assertion; it was not repeated in this round. This
+source qualification does not update the published preview package.
+
+## Previous adjacent-write qualification, 2026-10-22
 
 The native handler now combines physically adjacent writes within each commit
 phase, preserving the existing four durability barriers and undo format.

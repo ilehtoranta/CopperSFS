@@ -11,6 +11,87 @@ public sealed partial class AmigaSmartFileSystemTests
         Assert.True(AmigaFileSystemWriteCombiner.Initialize(ref disk, disk.WriteQueue, Bytes, capacity));
     }
 
+    [Theory]
+    [InlineData(4u, 1u)]
+    [InlineData(512u, 7u)]
+    [InlineData(512u, 128u)]
+    [InlineData(1024u, 128u)]
+    public void CompactQueuePreservesImagesAcrossRepeatedPermutationsAndInsertions(uint bytes, uint capacity)
+    {
+        var disk = new Disk(Image());
+        var queue = APTR.FromPointer(131072); var source = APTR.FromPointer(4000);
+        var size = AmigaFileSystemWriteCombiner.StorageBytes(bytes, capacity);
+        Array.Fill(disk.Ram, (byte)0xA7, (int)queue.Raw - 1, (int)size + 2);
+        Assert.True(AmigaFileSystemWriteCombiner.Initialize(ref disk, queue, bytes, capacity));
+        var expected = new SortedDictionary<uint, byte[]>();
+        for (var index = 0u; index < capacity + 100; index++)
+        {
+            // Permuted arrival order, holes and colliding hash keys. After the
+            // queue fills, replace images in already permuted payload slots.
+            var block = ((index * 73) % capacity) * 65 + 1;
+            var data = Enumerable.Range(0, (int)bytes).Select(i => (byte)(index * 17 + i)).ToArray();
+            data.CopyTo(disk.Ram, (int)source.Raw);
+            Assert.True(AmigaFileSystemWriteCombiner.TryStore(ref disk, queue, block, 1, source));
+            expected[block] = data;
+            if (index % 7 != 0 && index != capacity + 99) continue;
+            // Sorting twice must be idempotent, including after additions.
+            for (var repeat = 0; repeat < 2; repeat++)
+            {
+                AmigaFileSystemWriteCombiner.Sort(ref disk, queue);
+                var actual = new SortedDictionary<uint, byte[]>();
+                for (var ordinal = 0u; ordinal < expected.Count;)
+                {
+                    var run = AmigaFileSystemWriteCombiner.Run(ref disk, queue, ordinal, out var first, out var count);
+                    for (var i = 0u; i < count; i++)
+                        actual.Add(first + i, disk.Ram.AsSpan((int)(run.Raw + i * bytes), (int)bytes).ToArray());
+                    ordinal += count;
+                }
+                Assert.Equal(expected.Keys, actual.Keys);
+                foreach (var (key, value) in expected)
+                {
+                    Assert.Equal(value, actual[key]);
+                    var view = AmigaFileSystemWriteCombiner.ReadView(ref disk, queue, key);
+                    Assert.Equal(value, disk.Ram.AsSpan((int)view.Raw, (int)bytes).ToArray());
+                }
+            }
+            Assert.Equal(0xA7, disk.Ram[queue.Raw - 1]);
+            Assert.Equal(0xA7, disk.Ram[queue.Raw + size]);
+        }
+        Assert.Equal(capacity, AmigaFileSystemWriteCombiner.Count(ref disk, queue));
+        Assert.True(AmigaFileSystemWriteCombiner.StorageBytes(512, 128) < 70 * 1024);
+    }
+
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(5)]
+    public void CompactQueueCanExtendAndReplaceRunsAfterPartialDrainFailure(int failAt)
+    {
+        var disk = new Disk(Image()) { Buffered = true }; Combine(ref disk, 8);
+        foreach (var block in new uint[] { 70, 7, 69, 5, 6 }) Store(block, (byte)block);
+        disk.FailAtWrite = failAt;
+        Assert.False(disk.Flush());
+        Assert.Equal(0, disk.Flushes);
+        Assert.Equal(5u, AmigaFileSystemWriteCombiner.Count(ref disk, disk.WriteQueue));
+        Store(6, 0xA7); Store(8, 8); Store(68, 68);
+        foreach (var block in new uint[] { 5, 6, 7, 8, 68, 69, 70 })
+        {
+            Assert.True(disk.ReadBlock(block, APTR.FromPointer(4000)));
+            Assert.All(disk.Ram.AsSpan(4000, Bytes).ToArray(), b => Assert.Equal(block == 6 ? 0xA7 : (byte)block, b));
+        }
+        disk.FailAtWrite = 0; disk.PhysicalWrites.Clear();
+        Assert.True(disk.Flush());
+        Assert.Equal(new[] { (5u, 4u), (68u, 3u) }, disk.PhysicalWrites);
+        foreach (var block in new uint[] { 5, 6, 7, 8, 68, 69, 70 })
+            Assert.All(disk.Snapshot().AsSpan((int)block * Bytes, Bytes).ToArray(), b => Assert.Equal(block == 6 ? 0xA7 : (byte)block, b));
+
+        void Store(uint block, byte value)
+        {
+            Array.Fill(disk.Ram, value, 4000, Bytes);
+            Assert.True(disk.WriteBlock(block, APTR.FromPointer(4000)));
+        }
+    }
+
     [Fact]
     public void CombiningOwnsDataSortsAdjacentBlocksAndNeverWritesHoles()
     {

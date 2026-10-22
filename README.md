@@ -25,6 +25,9 @@ use only a disposable volume with an independent backup.
 
 Public types use the `CopperSFS` namespace. Integrators supply their own block
 device and guest-memory adapter through the platform interfaces.
+`BlockCount`, `BlockBytes` and `ReservedBlocks` must match the corresponding
+fields in `Geometry` and remain stable while mounted. Scalar getters let native
+adapters avoid constructing the full device descriptor during traversal.
 
 The engine does not format volumes. It uses classic 32-bit AmigaDOS file sizes
 and seek positions. A partition above 4 GiB additionally needs a block device

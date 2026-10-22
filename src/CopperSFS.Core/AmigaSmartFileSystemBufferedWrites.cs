@@ -37,6 +37,15 @@ public static partial class AmigaSmartFileSystemWriteCore
     {
         uint image = 0, entry = 0;
         var existing = AmigaSmartFileSystemWriteBuffer.Find(ref p, w.Buffered, w.BlockBytes, target);
+        if (existing.IsNotNull && source == AmigaSmartFileSystemWriteBuffer.Image(existing) &&
+            p.ReadUInt32(existing, 4) != 0)
+        {
+            // Edit already captured this operation's savepoint before exposing
+            // the owned image. Publishing it only restores its verification;
+            // there is no second copy or savepoint to capture.
+            p.WriteUInt32(existing, 8, verifiedId);
+            return true;
+        }
         if (existing.IsNull)
         {
             if (AmigaSmartFileSystemWriteBuffer.Count(ref p, w.Buffered) == p.ReadUInt32(w.Buffered, 4))
@@ -114,7 +123,7 @@ public static partial class AmigaSmartFileSystemWriteCore
             w.BufferFull = false;
             if (w.Buffered.IsNotNull)
             {
-                w.BlockBytes = p.ReadUInt32(buffer, 24) != 0 ? p.ReadUInt32(buffer, 60) : p.Geometry.BlockBytes;
+                w.BlockBytes = p.ReadUInt32(buffer, 24) != 0 ? p.ReadUInt32(buffer, 60) : p.BlockBytes;
                 AmigaSmartFileSystemWriteBuffer.Begin(ref p, buffer, w.BlockBytes);
             }
             var success = operation switch

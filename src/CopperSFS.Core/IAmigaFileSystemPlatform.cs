@@ -6,6 +6,11 @@ namespace CopperSFS;
 public interface IAmigaFileSystemPlatform : IAmigaGuestMemory
 {
     AmigaVolumeGeometry Geometry { get; }
+    /// <summary>Stable mounted geometry scalars, identical to Geometry's fields.
+    /// Native platforms can return them without constructing the device descriptor.</summary>
+    uint BlockCount { get; }
+    uint BlockBytes { get; }
+    uint ReservedBlocks { get; }
     bool ReadBlock(uint block, APTR destination);
     /// <summary>Read metadata and verify its type, own-block number and SFS checksum.
     /// A cache may retain this verification only while its private image is unchanged.</summary>

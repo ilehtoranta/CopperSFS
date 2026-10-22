@@ -111,8 +111,13 @@ images, including the completed prefix: live recovery can replace queued home
 blocks with undo images, then retry. Discarding the queue on an I/O error would
 lose acknowledged data. Destruction after a crash must not implicitly flush it.
 
-At 512 bytes per block, a 128-block queue requires 133,920 bytes, including scratch
-space for gathering adjacent blocks that arrived out of order. Initialization
+At 512 bytes per block, a 128-block queue requires 69,408 bytes, including one
+block of scratch space. Stable hash entries and an inverse slot map let sorting
+permute the owned images in place. Adjacent runs can then transfer directly
+from those images; a second full payload array is unnecessary. Sorting retains
+every image, including after a partial transfer failure, and can repeat after
+replacements or further insertions. Read-only queue views expire at the next
+mutation, sort or discard; copy them before retaining or editing them. Initialization
 and all operations are allocation-free. Embedders may omit it when memory is
 scarce; their durability contract remains the same. The device layer must still
 honor its DMA memory requirements, alignment, maximum transfer size and large

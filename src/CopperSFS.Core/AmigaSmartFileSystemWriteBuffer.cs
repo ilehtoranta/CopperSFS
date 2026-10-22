@@ -11,8 +11,12 @@ namespace CopperSFS;
 public static class AmigaSmartFileSystemWriteBuffer
 {
     public const uint MaximumCapacity = 32;
-    private const uint Header = 336, EntryHeader = 24;
-    private const uint HashOffset = 80;
+    private const uint Header = 336;
+    /// <summary>Native adapter layout for in-place verified lookup. Images are
+    /// read-only outside Edit/Store; adapters must honor HiddenOffset and the
+    /// verification tag, which every mutation invalidates.</summary>
+    public const uint EntryHeader = 24, HashOffset = 80;
+    public const int HiddenOffset = 16, VerificationOffset = 8, HashLinkOffset = 20;
     // Header: count, capacity, operation-start count, active, hidden, pending commit.
     public static uint StorageBytes(uint bytes, uint capacity) => Header + capacity * (EntryHeader + bytes * 3);
 

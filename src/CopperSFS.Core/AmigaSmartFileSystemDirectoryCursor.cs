@@ -29,8 +29,8 @@ public static partial class AmigaSmartFileSystemCore
                 if (initial.IsNull) return DOS.Error.InvalidLock;
                 if ((p.ReadUInt8(initial, at + 24) & 128) == 0) return DOS.Error.ObjectWrongType;
                 var first = p.ReadUInt32(initial, at + 16);
-                var geometry = p.Geometry;
-                cursor.BlockBytes = geometry.BlockBytes; cursor.BlockCount = geometry.BlockCount;
+
+                cursor.BlockBytes = p.BlockBytes; cursor.BlockCount = p.BlockCount;
                 cursor.Directory = directory; cursor.Container = first; cursor.Visited = 1;
                 cursor.Remaining = 0; cursor.Wanted = wanted;
                 if (first == 0) return DOS.Error.NoMoreEntries;
@@ -50,8 +50,8 @@ public static partial class AmigaSmartFileSystemCore
                 var found = p.ReadUInt32(fib);
                 var initial = ObjectView(ref p, found, metadata, out var at);
                 if (initial.IsNull) return DOS.Error.DiskNotValidated;
-                var geometry = p.Geometry;
-                cursor.BlockBytes = geometry.BlockBytes; cursor.BlockCount = geometry.BlockCount;
+
+                cursor.BlockBytes = p.BlockBytes; cursor.BlockCount = p.BlockCount;
                 cursor.Directory = directory; cursor.Container = p.ReadUInt32(initial, 8); cursor.Visited = 1;
                 if (!IndexDirectory(ref p, ref cursor, initial, (uint)at)) return DOS.Error.DiskNotValidated;
                 if (cursor.Remaining <= cursor.Capacity) cursor.Wanted = found;

@@ -5,6 +5,34 @@ namespace CopperSFS.Tests;
 
 public sealed partial class AmigaSmartFileSystemTests
 {
+    [Theory]
+    [InlineData(0u)]
+    [InlineData(40u)]
+    public void ContiguousAppendKeepsReadOnlyMetadataUnchangedUntilCheckpointCapture(uint preferred)
+    {
+        var disk = new Disk(Image()) { Buffered = true, CheckReadOnlyViews = true };
+        var work = BufferedWork(ref disk);
+        var request = new AmigaSmartFileSystemWriteCore.Request
+        { Directory = 1, Name = disk.Name("Run"), Length = 3 };
+        Assert.True(AmigaSmartFileSystemWriteCore.Create(ref disk, ref work, ref request, false));
+        Assert.True(AmigaSmartFileSystemWriteCore.Flush(ref disk, ref work));
+        var node = request.Node;
+        work.AllocationCursor = work.JournalCursor = preferred;
+        for (var index = 0u; index < 3; index++)
+        {
+            Array.Fill(disk.Ram, (byte)0xA7, 4000, 2048);
+            request = new() { Node = node, Position = index * 2048, Buffer = APTR.FromPointer(4000), Length = 2048 };
+            Assert.True(AmigaSmartFileSystemWriteCore.Write(ref disk, ref work, ref request, out var actual));
+            Assert.Equal(2048u, actual);
+        }
+        Assert.True(AmigaSmartFileSystemWriteCore.Flush(ref disk, ref work));
+        var read = AmigaSmartFileSystemCore.Read(ref disk, node, 0, APTR.FromPointer(32768), 6144,
+            work.Meta, work.Data, out var error);
+        Assert.Equal(DOS.Error.None, error); Assert.Equal(6144, read);
+        Assert.All(disk.Ram.AsSpan(32768, 6144).ToArray(), b => Assert.Equal(0xA7, b));
+        Assert.Equal(0, disk.GeometryReads);
+    }
+
     [Fact]
     public void HashedDirectoryLookupUsesNodeHashesAndChecksContainerOwnership()
     {
