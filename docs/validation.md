@@ -1,5 +1,17 @@
 # Validation boundary
 
+## Preview.3 package identity
+
+The `v0.1.0-preview.3` packages use the exact handler bytes qualified below,
+without rebuilding or modifying them for release. The 68020 ZIP contains the
+buffered `CopperSFS` and optional `CopperSFS-strict`; the separate 68000 ZIP
+contains the buffered compatibility build. Its coverage remains the limited
+68000-HUNK-on-68020 checks stated below, not the 68020 recovery/performance
+qualification. The [release manifest](../packaging/v0.1.0-preview.3.json)
+records sizes and SHA-256 hashes. Each ZIP includes the same manifest as
+`RELEASE.json`, installation instructions, a mount example and file checksums.
+See [installation and upgrade](handler-install.md) before selecting a variant.
+
 ## Compact queue and write CPU qualification, 2026-10-22
 
 The buffered handler now uses fewer guest CPU cycles than original SFS in all

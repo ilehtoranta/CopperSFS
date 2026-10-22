@@ -4,15 +4,18 @@ CopperSFS is an experimental, allocation-free implementation of the classic
 Amiga Smart File System on-disk format (`SFS\0`). This repository contains the
 portable filesystem core and its host tests.
 
-**Status: experimental preview.** A compiled AmigaOS `L:` handler is available
-in [prereleases](https://github.com/ilehtoranta/CopperSFS/releases); its source
-is not part of this repository. The external handler has been compared with
+**Status: experimental preview.** [Preview.3](https://github.com/ilehtoranta/CopperSFS/releases/tag/v0.1.0-preview.3)
+provides a buffered 68020 handler, an optional strict 68020 handler, and a
+separate 68000 compatibility package with limited validation. Select the
+package for your CPU and read the updated [installation and upgrade guide](docs/handler-install.md).
+The handler integration source is not part of this repository. The external
+handler has been compared with
 original SmartFilesystem 1.279 under Kickstart 3.1, including clean handoff and
 write/flush interruption sweeps. Source changes and published preview binaries
 have separate qualification records: see [validation](docs/validation.md).
-Other ROM versions and physical hardware remain unqualified. See the
-[installation guide](docs/handler-install.md) and
-use only a disposable volume with an independent backup.
+Other ROM versions and physical hardware remain unqualified. Use only a
+disposable volume with an independent backup. Buffered writes are
+the default in preview.3; recent unflushed changes may be lost after a crash.
 
 ## What is here
 

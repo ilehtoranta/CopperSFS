@@ -1,0 +1,30 @@
+{
+  "version": "v0.1.0-preview.3",
+  "qualifiedCoreRevision": "c46c162d5233652c1d9428a785aa6bec7b5d2a41",
+  "handlers": [
+    {
+      "cpu": "68020",
+      "file": "CopperSFS",
+      "policy": "buffered",
+      "bytes": 104568,
+      "sha256": "24e56660a6251d4eb267983cf547351fa37376fbd6178534faa563ae799593ce",
+      "qualification": "Full Kickstart 3.1 / 68020 correctness, recovery and five-trial A/B performance comparison."
+    },
+    {
+      "cpu": "68020",
+      "file": "CopperSFS-strict",
+      "policy": "strict",
+      "bytes": 104360,
+      "sha256": "b3aa61500e078a3b9bbb66860f7243e982c6913b499ade6e7819076256751ca8",
+      "qualification": "Kickstart 3.1 / 68020 strict correctness, recovery and clean handoff; no performance claim."
+    },
+    {
+      "cpu": "68000",
+      "file": "CopperSFS",
+      "policy": "buffered",
+      "bytes": 106304,
+      "sha256": "9ec8fd11fb01153853a8d857873439a367d4d7205463e6eb17bcd34ed9b91563",
+      "qualification": "Mount and shared workload/remount on the 68020 profile only. Full 68000 Kickstart boot and physical hardware remain unqualified."
+    }
+  ]
+}
