@@ -22,6 +22,7 @@ public sealed partial class AmigaSmartFileSystemTests
         public APTR WriteQueue;
         public readonly List<(uint Block, uint Count)> PhysicalWrites = [];
         public bool Buffered;
+        public bool ReadOnly;
         public bool RequireAlignedBlockBuffers;
         public bool CheckReadOnlyViews;
         private byte[]? readOnlyView;
@@ -68,7 +69,7 @@ public sealed partial class AmigaSmartFileSystemTests
             else image.AsSpan((int)block * Bytes, Bytes).CopyTo(Ram.AsSpan((int)destination.Raw, Bytes));
             return true;
         }
-        public bool WriteProtected() => false;
+        public bool WriteProtected() => ReadOnly;
         public bool Flush()
         {
             if (!DrainWrites()) return false;
