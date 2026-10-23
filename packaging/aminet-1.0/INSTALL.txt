@@ -20,7 +20,7 @@ other ROMs and native partitions above 4 GiB remain unqualified.
 
 3. If the previous session crashed, recover its CSUN transaction with
    CopperSFS on a writable device first. Preserve the image if recovery
-   fails. Never expose an unresolved CSUN transaction to original SFS.
+   fails. Never expose an unresolved CSUN transaction to another SFS handler.
 
 4. Boot from a separate volume with the test volume unmounted. Back up the
    old handler. Replacing L:CopperSFS does not replace a running handler.
@@ -85,8 +85,7 @@ mutation, but does not make multiple application operations atomic.
 
 Use Version L:CopperSFS FILE FULL. The tag identifies version, CPU, policy
 and requested cache capacity, not the smaller pool actually allocated.
-The date uses dd.mm.yyyy. Version 39.1/40.1 misrender modern years; Amiga's
-official Version 40.3 update fixes this. Version SFS0: lookup is not added.
+Version SFS0: lookup is not added.
 
 Compatibility, benchmarks and recovery limits are in VALIDATION.txt.
 The handler uses classic 32-bit DOS file sizes and seek positions. TD64/NSD

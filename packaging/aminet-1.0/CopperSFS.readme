@@ -10,7 +10,8 @@ Distribution: Aminet
 
 CopperSFS 1.0 is an experimental AmigaDOS filesystem handler for classic
 Smart File System (SFS\0) volumes. It is a new implementation, independent
-of original SmartFilesystem. Install it as L:CopperSFS on a separate boot
+of the existing SFS implementations. SFS was created by John Hendrikx.
+Install CopperSFS as L:CopperSFS on a separate boot
 volume. It does not format partitions or install an RDB filesystem.
 
 This package requires a 68020 or newer CPU. Every included executable uses
@@ -35,21 +36,15 @@ The pool falls back to smaller allocations or uncached reads when needed.
 ADDBUFFERS controls a different cache. Default loaded-and-mounted memory
 measured about 570 KiB on the test profile; INSTALL.txt gives full figures.
 
-The underlying default and strict code was A/B tested against original
-SmartFilesystem 1.279 under Kickstart 3.1, including concurrent reads/writes,
+The underlying default and strict code was A/B tested against the 68k
+SmartFilesystem 1.279 from Joerg Strohmayer's development branch under
+Kickstart 3.1, including concurrent reads/writes,
 independent disk checks and 329 interrupted-write/recovery cases across
 both implementations. Version stamping preserves all original code/data
 and relocations. These new binary hashes have not received a new full A/B
 sweep. The 1.0 default passed native Version 40.3 identification/date and
 mount/read checks. Alternate cache builds have narrower qualification.
 Read VALIDATION.txt for the exact coverage and crash-model limits.
-
-Version identification uses the standard four-digit date:
-  $VER: CopperSFS 1.0 (23.10.2026) 68020 buffered cache=256KiB
-  Version L:CopperSFS FILE FULL
-
-Version 39.1/40.1 have a documented Y2K date-display bug. The official
-Version 40.3 update or a newer corrected command displays the date properly.
 
 Read INSTALL.txt before installing or changing the selected executable.
 Verify files against SHA256SUMS.txt on a host with SHA-256 support.
