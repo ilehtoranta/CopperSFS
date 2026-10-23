@@ -50,9 +50,8 @@ Read VALIDATION.txt for the exact coverage and crash-model limits.
 
 Read INSTALL.txt before installing or changing the selected executable.
 Verify files against SHA256SUMS.txt on a host with SHA-256 support.
-LICENSE.txt gives the MIT license and identifies the CopperSFS and
-CopperSharp68k components covered by it. Native handler integration source
-is not included.
+CopperSFS is distributed under the MIT license in LICENSE.txt.
+Native handler integration source is not included.
 
 Report reproducible problems at the public repository, including handler
 hash, CPU, OS, device, geometry and steps using a disposable volume.
