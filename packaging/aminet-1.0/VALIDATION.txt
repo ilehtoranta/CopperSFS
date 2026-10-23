@@ -1,0 +1,68 @@
+CopperSFS 1.0 - qualification boundary
+====================================
+
+SFS was originally created by John Hendrikx. The comparison handler is the
+68k SmartFilesystem 1.279 from Joerg Strohmayer's development branch.
+
+This is an experimental 68020 package. Version 1.0 identifies the build;
+it does not extend the tested hardware, operating system or device scope.
+
+The default and strict instruction/data bytes and relocations match the
+clean-data-cache qualification. Only two HUNK length words and appended
+version metadata differ. New handler hashes are recorded in RELEASE.json.
+The new hashes have NOT received a new exhaustive A/B recovery/performance
+run. Version 1.0 default passed original Version 40.3 date/identity and
+mount/read execution under Kickstart 3.1. Forty structural stamping cases
+and all seven candidate binary audits passed. Six 68020 builds are shipped;
+the 68000 candidate is omitted because system-level validation is incomplete.
+
+The underlying code passed 203 host tests, 13 buffered native cases, seven
+strict cases and independent amidisk extraction/deep checks. Native coverage
+included concurrent writers/readers, shared handles and positions, metadata,
+directory operations, clean remounts, both clean handoff directions and
+reference-handler TRST replay. Host semantic and native instruction tests differ.
+
+329 unsampled interrupted-write/reboot cases passed: 98 buffered CopperSFS,
+107 strict CopperSFS and 62 reference SFS cases repeated for each comparison.
+Create, overwrite, truncate, rename and delete cuts covered relevant sector
+writes and flushes, including sectors within combined requests. Each image
+was recovered by its writing handler. Unresolved CSUN was never given to
+reference SFS. The model assumes atomic 512-byte sectors, honored ordered
+flushes and loss of unflushed writes. Torn sectors, dishonest/reordered
+flushes, physical controllers and hardware are outside this qualification.
+
+Default buffered code: five-trial median guest CPU cycles, Copper/reference:
+Sequential 1 MiB read       2,046,949 /  2,551,011   requests 128 / 128
+Sequential 1 MiB write     13,545,310 / 14,419,570   requests 136 / 136
+Small-file creation        9,339,180 / 10,376,190   requests  15 /  17
+Directory enumeration      6,231,920 /  7,839,441   requests   0 /   0
+Mixed access               9,267,560 /  9,358,840   requests  15 /  15
+Repeated 1 MiB stream       2,036,140 /  2,580,020   requests 128 / 128
+
+Requests count reads, writes and flushes, not sectors. CopperSFS writes more
+sectors in some workloads despite matching total requests. These are CPU/I/O
+measurements, not physical throughput. Strict and alternate-cache builds
+have no performance claim. Alternate budgets passed memory/coherence tests
+only, including truncate, overwrite, block reuse and remount.
+
+A separate 64 KiB warm working set issued zero requests with the clean cache,
+versus 16 for the preceding CopperSFS and eight for reference SFS. Warm RAM
+copying cost 98.2% more guest CPU than preceding direct emulated I/O, while
+using 12.8% fewer cycles than reference SFS. Cold small-read CPU added 0.24%
+with unchanged requests against the preceding build. Large streams bypass
+the pool. These comparisons are not normalized to equal total memory use.
+
+Profile: Kickstart 3.1, 68020, 512 KiB chip, 2 MiB fast, 512 KiB slow RAM,
+32 mount buffers, 512-byte sectors; separate fresh copies of a 16 MiB base
+for every handler/run. Geometry: two surfaces, 32 blocks/track, cylinders
+0-511, two reserved blocks, offset zero. Mask 0x7FFFFFFF, MaxTransfer 0x1FE00.
+Boot and image-copy time excluded. This is test geometry, not install advice.
+
+Base image SHA-256:
+36119C09B6480AD11A748EA011774F2A4F30E9659C0A9FC03E13FA4747983ED1
+Reference 68k SmartFilesystem 1.279 (Joerg Strohmayer branch) SHA-256:
+C7DD174131035A0F5845BE1076FB5C55642F6AA2125D4B5D8C029B141DCC8205
+amidisk revision: a4faa7b36bd7c005371d9bb509a936a13d58b43f
+
+Public sources and further details:
+https://github.com/ilehtoranta/CopperSFS

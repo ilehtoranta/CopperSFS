@@ -30,6 +30,109 @@ public sealed partial class AmigaSmartFileSystemTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void DeleteOnWriteProtectedMediaPreservesTheAmigaDosError(bool buffered)
+    {
+        // RKM AmigaDOS 10.2.9 distinguishes physical/software media protection
+        // (ERROR_DISK_WRITE_PROTECTED) from an unvalidated filesystem.
+        var image = RecycledImage(); var before = image.ToArray();
+        var disk = new Disk(image) { ReadOnly = true };
+        var work = buffered ? BufferedWork(ref disk) : BatchWork(ref disk);
+        Assert.False(AmigaSmartFileSystemWriteCore.Remove(ref disk, ref work, 3));
+        Assert.Equal(DOS.Error.DiskWriteProtected, work.Error);
+        Assert.Equal(0, disk.Writes);
+        Assert.Equal(before, disk.Snapshot());
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void RecycledCollisionsRespectVolumeCasePolicy(bool buffered, bool sensitive)
+    {
+        var image = RecycledImage();
+        foreach (var block in new[] { 0, Blocks - 1 })
+        { Block(image, block)[20] = (byte)(64 | (sensitive ? 128 : 0)); Sum(Block(image, block)); }
+        var disk = new Disk(image) { CheckReadOnlyViews = true };
+        var work = buffered ? BufferedWork(ref disk) : BatchWork(ref disk);
+        Assert.True(AmigaSmartFileSystemWriteCore.Remove(ref disk, ref work, 3), work.Error.ToString());
+        var request = new AmigaSmartFileSystemWriteCore.Request
+        { Directory = 1, Name = disk.Name("hello"), Length = 5 };
+        Assert.True(AmigaSmartFileSystemWriteCore.Create(ref disk, ref work, ref request, false), work.Error.ToString());
+        Assert.True(AmigaSmartFileSystemWriteCore.Remove(ref disk, ref work, request.Node), work.Error.ToString());
+        var recycled = sensitive ? "hello" : "hello$AAA";
+        Assert.Equal(request.Node, AmigaSmartFileSystemCore.Resolve(ref disk, 2, disk.Name(recycled),
+            (uint)recycled.Length, work.Meta, out var error));
+        Assert.Equal(DOS.Error.None, error);
+        AssertRecycledCounters(ref disk, 3, 4);
+        Assert.True(AmigaSmartFileSystemWriteCore.Flush(ref disk, ref work), work.Error.ToString());
+        var remounted = new Disk(image); work = BatchWork(ref remounted);
+        Assert.True(AmigaSmartFileSystemCore.Mount(ref remounted, work.Meta));
+        Assert.Equal(request.Node, AmigaSmartFileSystemCore.Resolve(ref remounted, 2, remounted.Name(recycled),
+            (uint)recycled.Length, work.Meta, out error));
+    }
+
+    [Fact]
+    public void RecoveryRefreshesCachedRecyclingPolicy()
+    {
+        var image = RecycledImage(); var disk = new Disk(image);
+        var work = BufferedWork(ref disk);
+        Assert.True(AmigaSmartFileSystemWriteCore.Resize(ref disk, ref work, 3, 1300));
+        Assert.True(AmigaSmartFileSystemWriteCore.Flush(ref disk, ref work));
+        foreach (var block in new[] { 0, Blocks - 1 })
+        { Block(image, block)[20] = 0; Sum(Block(image, block)); }
+        Assert.True(AmigaSmartFileSystemWriteCore.Recover(ref disk, ref work));
+        Assert.True(AmigaSmartFileSystemWriteCore.Remove(ref disk, ref work, 3), work.Error.ToString());
+        Assert.Equal(0u, AmigaSmartFileSystemCore.Resolve(ref disk, 2, disk.Name("Hello"), 5, work.Meta, out var error));
+        Assert.Equal(DOS.Error.ObjectNotFound, error);
+        AssertRecycledCounters(ref disk, 1, 1);
+        Assert.True(AmigaSmartFileSystemWriteCore.Flush(ref disk, ref work));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RecyclingCompactsWordAlignedRecordsWithoutChangingNeighbors(bool buffered)
+    {
+        var image = RecycledImage(); var disk = new Disk(image) { CheckReadOnlyViews = true };
+        var work = buffered ? BufferedWork(ref disk) : BatchWork(ref disk);
+        var nodes = new uint[8];
+        for (var i = 0; i < nodes.Length; i++)
+        {
+            var name = new string((char)('a' + i), i + 1);
+            var request = new AmigaSmartFileSystemWriteCore.Request
+            { Directory = 1, Name = disk.Name(name), Length = (uint)name.Length };
+            Assert.True(AmigaSmartFileSystemWriteCore.Create(ref disk, ref work, ref request, false), work.Error.ToString());
+            nodes[i] = request.Node;
+            var commentLength = 1 + i % 3;
+            request.Buffer = disk.Name(new string((char)('A' + i), commentLength)); request.Length = (uint)commentLength;
+            Assert.True(AmigaSmartFileSystemWriteCore.SetMetadata(ref disk, ref work, ref request, DosPacketAction.SetComment), work.Error.ToString());
+        }
+        // Move records from the middle, exercising both checksum half-word
+        // boundaries and overlapping compaction with live neighbors after it.
+        foreach (var i in new[] { 3, 1, 6, 0, 7, 2, 5, 4 })
+            Assert.True(AmigaSmartFileSystemWriteCore.Remove(ref disk, ref work, nodes[i]), work.Error.ToString());
+        Assert.True(AmigaSmartFileSystemWriteCore.Flush(ref disk, ref work), work.Error.ToString());
+        var remounted = new Disk(image); work = BatchWork(ref remounted);
+        Assert.True(AmigaSmartFileSystemCore.Mount(ref remounted, work.Meta));
+        for (var i = 0; i < nodes.Length; i++)
+        {
+            var name = new string((char)('a' + i), i + 1);
+            Assert.Equal(nodes[i], AmigaSmartFileSystemCore.Resolve(ref remounted, 2, remounted.Name(name),
+                (uint)name.Length, work.Meta, out var error));
+            Assert.Equal(DOS.Error.None, error);
+            var fib = APTR.FromPointer(6000);
+            Assert.True(AmigaSmartFileSystemCore.Examine(ref remounted, nodes[i], fib, work.Meta));
+            var commentLength = 1 + i % 3;
+            Assert.Equal(commentLength, remounted.ReadUInt8(fib, 144));
+            for (var j = 0; j < commentLength; j++) Assert.Equal((byte)('A' + i), remounted.ReadUInt8(fib, 145 + j));
+        }
+        AssertRecycledCounters(ref remounted, 9, 1);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void DeleteRecyclesFilesAndPermanentDeleteUpdatesCounters(bool buffered)
     {
         var image = RecycledImage(); var disk = new Disk(image);

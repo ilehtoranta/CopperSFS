@@ -176,7 +176,7 @@ public static partial class AmigaSmartFileSystemCore
         return buffer.IsNotNull && Scan(ref p, buffer, node, bytes, out offset, out _) ? buffer : APTR.Null;
     }
 
-    private static APTR NodeView<T>(ref T p, uint node, uint root, uint blockCount, uint bytes,
+    internal static APTR NodeView<T>(ref T p, uint node, uint root, uint blockCount, uint bytes,
         APTR scratch, out int offset) where T : struct, IAmigaFileSystemPlatform
     {
         offset = 0;
@@ -237,6 +237,18 @@ public static partial class AmigaSmartFileSystemCore
         var caseSensitive = (p.ReadUInt8(view, 20) & 128) != 0;
         var rootContainer = p.ReadUInt32(view, 104);
         var nodeRoot = p.ReadUInt32(view, 112);
+        return ResolveFromRoots(ref p, directory, name, length, metadata, rootContainer, nodeRoot,
+            blockCount, blockBytes, caseSensitive, out error, out record, out recordOffset);
+    }
+
+    // Callers must have validated these roots for the current mounted volume.
+    internal static uint ResolveFromRoots<T>(ref T p, uint directory, APTR name, uint length, APTR metadata,
+        uint rootContainer, uint nodeRoot, uint blockCount, uint blockBytes, bool caseSensitive,
+        out DOS.Error error, out APTR record, out int recordOffset) where T : struct, IAmigaFileSystemPlatform
+    {
+        record = APTR.Null; recordOffset = 0; error = DOS.Error.None;
+        if (length > 255) { error = DOS.Error.InvalidComponentName; return 0; }
+        var view = APTR.Null;
         var start = 0u;
         for (var i = 0u; i < length; i++) if (p.ReadUInt8(name, (int)i) == ':') { directory = RootNode; start = i + 1; }
         while (start < length)
@@ -286,8 +298,7 @@ public static partial class AmigaSmartFileSystemCore
                     for (var i = 0u; same && i < end - start; i++)
                     {
                         var a = p.ReadUInt8(name, (int)(start + i)); var b = p.ReadUInt8(view, pos + 25 + (int)i);
-                        if (!caseSensitive) { a = Upper(a); b = Upper(b); }
-                        same = a == b;
+                        same = a == b || (!caseSensitive && Upper(a) == Upper(b));
                     }
                     if (same && p.ReadUInt8(view, pos + 25 + (int)(end - start)) == 0)
                     { matched = p.ReadUInt32(view, pos + 4); record = view; recordOffset = pos; break; }
@@ -339,8 +350,7 @@ public static partial class AmigaSmartFileSystemCore
                 {
                     var a = p.ReadUInt8(name, (int)(start + i));
                     var b = p.ReadUInt8(view, at + 25 + (int)i);
-                    if (!sensitive) { a = Upper(a); b = Upper(b); }
-                    same = a == b;
+                    same = a == b || (!sensitive && Upper(a) == Upper(b));
                 }
                 if (same && p.ReadUInt8(view, at + 25 + (int)length) == 0)
                 { record = view; recordOffset = at; error = DOS.Error.None; return node; }
