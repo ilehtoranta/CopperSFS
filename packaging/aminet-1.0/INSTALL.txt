@@ -88,5 +88,6 @@ and requested cache capacity, not the smaller pool actually allocated.
 Version SFS0: lookup is not added.
 
 Compatibility, benchmarks and recovery limits are in VALIDATION.txt.
-The handler uses classic 32-bit DOS file sizes and seek positions. TD64/NSD
-is additionally required beyond 4 GiB; native large-device use is unqualified.
+The handler uses classic 32-bit DOS file sizes and seek positions. Device
+access beyond the 4 GiB boundary requires TD64 reads and writes. NSD is not
+supported. Native large-device use remains unqualified.

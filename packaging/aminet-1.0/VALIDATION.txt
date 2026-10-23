@@ -6,6 +6,8 @@ SFS was originally created by John Hendrikx. The comparison handler is the
 
 This is an experimental 68020 package. Version 1.0 identifies the build;
 it does not extend the tested hardware, operating system or device scope.
+The handler uses TD64 for 64-bit device offsets. NSD is not supported.
+Native device access beyond 4 GiB remains unqualified.
 
 The default and strict instruction/data bytes and relocations match the
 clean-data-cache qualification. Only two HUNK length words and appended

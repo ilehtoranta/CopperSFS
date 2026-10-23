@@ -34,8 +34,9 @@ fields in `Geometry` and remain stable while mounted. Scalar getters let native
 adapters avoid constructing the full device descriptor during traversal.
 
 The engine does not format volumes. It uses classic 32-bit AmigaDOS file sizes
-and seek positions. A partition above 4 GiB additionally needs a block device
-with TD64 or NSD 64-bit I/O; block-device integration is outside this core.
+and seek positions. The native handler requires TD64 for device access beyond
+the 4 GiB boundary. NSD is not supported; native large-device use remains
+unqualified. Block-device integration is outside the portable core.
 
 CopperSFS writes a private `CSUN` undo journal. If power is lost during a
 CopperSFS mutation, remount with CopperSFS to recover it before exposing the

@@ -19,6 +19,8 @@ separate boot volume.
 This package requires a 68020 or newer CPU. Every included executable uses
 the 68020 instruction set. Use disposable test volumes with independent
 backups. Physical devices and other ROM configurations remain unqualified.
+Device access beyond 4 GiB requires TD64. NSD is not supported; native
+large-device use remains unqualified.
 
 The default handler uses buffered writes and a 256 KiB clean-data cache.
 Recent unflushed changes may be lost after a crash. The optional strict
