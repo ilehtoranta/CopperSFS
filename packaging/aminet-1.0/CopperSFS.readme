@@ -9,10 +9,12 @@ URL:          https://github.com/ilehtoranta/CopperSFS
 Distribution: Aminet
 
 CopperSFS 1.0 is an experimental AmigaDOS filesystem handler for classic
-Smart File System (SFS\0) volumes. It is a new implementation, independent
-of the existing SFS implementations. SFS was created by John Hendrikx.
-Install CopperSFS as L:CopperSFS on a separate boot
-volume. It does not format partitions or install an RDB filesystem.
+Smart File System (SFS\0) volumes. It is an independent implementation of
+the filesystem originally developed by John Hendrikx.
+
+This package contains the filesystem handler and documentation, without
+additional filesystem tools. Install CopperSFS as L:CopperSFS on a
+separate boot volume.
 
 This package requires a 68020 or newer CPU. Every included executable uses
 the 68020 instruction set. Use disposable test volumes with independent
@@ -38,8 +40,8 @@ measured about 570 KiB on the test profile; INSTALL.txt gives full figures.
 
 The underlying default and strict code was A/B tested against the 68k
 SmartFilesystem 1.279 from Joerg Strohmayer's development branch under
-Kickstart 3.1, including concurrent reads/writes,
-independent disk checks and 329 interrupted-write/recovery cases across
+Kickstart 3.1, including concurrent reads/writes, independent disk checks
+and 329 interrupted-write/recovery cases across
 both implementations. Version stamping preserves all original code/data
 and relocations. These new binary hashes have not received a new full A/B
 sweep. The 1.0 default passed native Version 40.3 identification/date and
@@ -49,8 +51,7 @@ Read VALIDATION.txt for the exact coverage and crash-model limits.
 Read INSTALL.txt before installing or changing the selected executable.
 Verify files against SHA256SUMS.txt on a host with SHA-256 support.
 Licenses for the portable core and compiler are included; native handler
-integration source is not included. No ROM, disk image, original SFS
-binary or reference Version command is included.
+integration source is not included.
 
 Report reproducible problems at the public repository, including handler
 hash, CPU, OS, device, geometry and steps using a disposable volume.
