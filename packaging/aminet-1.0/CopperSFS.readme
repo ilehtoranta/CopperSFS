@@ -1,0 +1,61 @@
+Short:        Smart File System handler for 68020+
+Author:       Ilkka Lehtoranta
+Uploader:     ilkleht gmail com (Ilkka Lehtoranta)
+Type:         disk/misc
+Version:      1.0
+Architecture: m68k-amigaos
+Requires:     AmigaOS 2.04+, 68020+, existing SFS0 volume
+URL:          https://github.com/ilehtoranta/CopperSFS
+Distribution: Aminet
+
+CopperSFS 1.0 is an experimental AmigaDOS filesystem handler for classic
+Smart File System (SFS\0) volumes. It is a new implementation, independent
+of original SmartFilesystem. Install it as L:CopperSFS on a separate boot
+volume. It does not format partitions or install an RDB filesystem.
+
+This package requires a 68020 or newer CPU. Every included executable uses
+the 68020 instruction set. Use disposable test volumes with independent
+backups. Physical devices and other ROM configurations remain unqualified.
+
+The default handler uses buffered writes and a 256 KiB clean-data cache.
+Recent unflushed changes may be lost after a crash. The optional strict
+handler commits each successful mutation before replying. Both modes use
+the same recovery journal and ordered flush barriers. Recover interrupted
+CSUN transactions with CopperSFS before using another filesystem handler.
+
+Cache capacity is selected by executable, not by a mount flag:
+  CopperSFS                 buffered, 256 KiB (default)
+  CopperSFS-strict          strict,   256 KiB
+  Variants/CopperSFS-cache0   buffered, disabled
+  Variants/CopperSFS-cache128 buffered, 128 KiB
+  Variants/CopperSFS-cache512 buffered, 512 KiB
+  Variants/CopperSFS-cache2048 buffered, 2 MiB requested
+
+The pool falls back to smaller allocations or uncached reads when needed.
+ADDBUFFERS controls a different cache. Default loaded-and-mounted memory
+measured about 570 KiB on the test profile; INSTALL.txt gives full figures.
+
+The underlying default and strict code was A/B tested against original
+SmartFilesystem 1.279 under Kickstart 3.1, including concurrent reads/writes,
+independent disk checks and 329 interrupted-write/recovery cases across
+both implementations. Version stamping preserves all original code/data
+and relocations. These new binary hashes have not received a new full A/B
+sweep. The 1.0 default passed native Version 40.3 identification/date and
+mount/read checks. Alternate cache builds have narrower qualification.
+Read VALIDATION.txt for the exact coverage and crash-model limits.
+
+Version identification uses the standard four-digit date:
+  $VER: CopperSFS 1.0 (23.10.2026) 68020 buffered cache=256KiB
+  Version L:CopperSFS FILE FULL
+
+Version 39.1/40.1 have a documented Y2K date-display bug. The official
+Version 40.3 update or a newer corrected command displays the date properly.
+
+Read INSTALL.txt before installing or changing the selected executable.
+Verify files against SHA256SUMS.txt on a host with SHA-256 support.
+Licenses for the portable core and compiler are included; native handler
+integration source is not included. No ROM, disk image, original SFS
+binary or reference Version command is included.
+
+Report reproducible problems at the public repository, including handler
+hash, CPU, OS, device, geometry and steps using a disposable volume.

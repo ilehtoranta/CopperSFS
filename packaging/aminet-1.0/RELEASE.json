@@ -1,0 +1,62 @@
+{
+  "version": "1.0",
+  "status": "experimental",
+  "publicCoreRevision": "0c64478a5a01f92162ae27db951b4e9f5fa09a30",
+  "qualification": "See VALIDATION.txt. New hashes have metadata/date checks, not a new full A/B sweep.",
+  "handlers": [
+    {
+      "file": "Variants/CopperSFS-cache0",
+      "inputDirectory": "v5-0-020",
+      "cpu": "68020",
+      "bytes": 108520,
+      "sha256": "b5929f443d738bc06b9231c7894270c53adef15245b372a99354fa8b83bc58bf",
+      "identity": "$VER: CopperSFS 1.0 (23.10.2026) 68020 buffered cache=0KiB",
+      "qualifiedPreStampSha256": "e329baafdf1ba725c55d50d704eeb755b6be3913ee9c8a3266a5e3a0f073ecff"
+    },
+    {
+      "file": "CopperSFS",
+      "inputDirectory": "v5-020",
+      "cpu": "68020",
+      "bytes": 108524,
+      "sha256": "76a5e2fdbc8946cccef97c10d5398bea0e7af2b15a5f080106998bf165b14474",
+      "identity": "$VER: CopperSFS 1.0 (23.10.2026) 68020 buffered cache=256KiB",
+      "qualifiedPreStampSha256": "370dae61ef6cc1dc9f4c143d4e7c30f96d49bad9cbe5284af669788cb308c280"
+    },
+    {
+      "file": "Variants/CopperSFS-cache128",
+      "inputDirectory": "v5-128-020",
+      "cpu": "68020",
+      "bytes": 108524,
+      "sha256": "0103c9063efc2773280d6f8a8529819a3cda850d443c454e8bf2514039a2a7e4",
+      "identity": "$VER: CopperSFS 1.0 (23.10.2026) 68020 buffered cache=128KiB",
+      "qualifiedPreStampSha256": "3088bd04f3ccb44f3ace06e5647483cf9b7347d8e50e8a6fcc0e32a1d7084e72"
+    },
+    {
+      "file": "Variants/CopperSFS-cache2048",
+      "inputDirectory": "v5-2048-020",
+      "cpu": "68020",
+      "bytes": 108528,
+      "sha256": "8dcb92ba5f682142e5500dc8dd6be1c35f3b19161acc5235b9a6d1358a56c0d0",
+      "identity": "$VER: CopperSFS 1.0 (23.10.2026) 68020 buffered cache=2048KiB",
+      "qualifiedPreStampSha256": "1c19f1cfcd46aebf98bf7461a9e2da672fbdcca56673028c76eabed45faf8363"
+    },
+    {
+      "file": "Variants/CopperSFS-cache512",
+      "inputDirectory": "v5-512-020",
+      "cpu": "68020",
+      "bytes": 108524,
+      "sha256": "fafe9e6b90ce67a5a4ccc48da4b85ee4a4ce84331b47c923d337534ad7ba8d3e",
+      "identity": "$VER: CopperSFS 1.0 (23.10.2026) 68020 buffered cache=512KiB",
+      "qualifiedPreStampSha256": "31012be4b56d25b1206b943f1e359de3f8bb9a7112b871ec86434a00f3a17bb3"
+    },
+    {
+      "file": "CopperSFS-strict",
+      "inputDirectory": "v5-strict-020",
+      "cpu": "68020",
+      "bytes": 108316,
+      "sha256": "90ddefb78804bbe5162fc232390a692a56346baad750555be0cc66db1761fde6",
+      "identity": "$VER: CopperSFS 1.0 (23.10.2026) 68020 strict cache=256KiB",
+      "qualifiedPreStampSha256": "567c5f5c901185ab0d16348e7b97442225351d0e65db9ab0af57161cc37e7409"
+    }
+  ]
+}
