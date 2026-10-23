@@ -1,16 +1,141 @@
 # Validation boundary
 
-## Preview.3 package identity
+## Preview.4 package identity and clean-data cache, 2026-10-23
+
+The `v0.1.0-preview.4` packages contain exact qualified HUNK bytes without
+rebuilding them for release. The 68020 ZIP contains default buffered
+`CopperSFS`, `CopperSFS-strict`, and buffered cache-budget choices
+`CopperSFS-cache0`, `CopperSFS-cache128`, `CopperSFS-cache512` and
+`CopperSFS-cache2048`. The separate 68000 ZIP contains only the default
+buffered 256 KiB cache build. The [release manifest](../packaging/v0.1.0-preview.4.json)
+records each variant's byte size, SHA-256 and qualification. The package also
+includes the same manifest as `RELEASE.json`. See
+[installation and upgrade](handler-install.md) for CPU and memory selection.
+
+| Variant | Bytes | SHA-256 |
+| --- | ---: | --- |
+| Buffered 68020, default 256 KiB | 108,460 | `370DAE61EF6CC1DC9F4C143D4E7C30F96D49BAD9CBE5284AF669788CB308C280` |
+| Strict 68020, 256 KiB | 108,252 | `567C5F5C901185AB0D16348E7B97442225351D0E65DB9AB0AF57161CC37E7409` |
+| Buffered 68020, disabled cache | 108,456 | `E329BAAFDF1BA725C55D50D704EEB755B6BE3913EE9C8A3266A5E3A0F073ECFF` |
+| Buffered 68020, 128 KiB | 108,460 | `3088BD04F3CCB44F3ACE06E5647483CF9B7347D8E50E8A6FCC0E32A1D7084E72` |
+| Buffered 68020, 512 KiB | 108,460 | `31012BE4B56D25B1206B943F1E359DE3F8BB9A7112B871EC86434A00F3A17BB3` |
+| Buffered 68020, 2 MiB requested | 108,460 | `1C19F1CFCD46AEBF98BF7461A9E2DA672FBDCCA56673028C76EABED45FAF8363` |
+| Buffered 68000, default 256 KiB | 110,256 | `9F8DA0CD3A3EBBF9DB7669EC4775E955391620EC958A0D36DEF3DD7F7591A99F` |
+
+The 68020 default and strict handlers completed their full Kickstart 3.1
+comparison against original SmartFilesystem 1.279. All 13 default buffered
+native cases and seven strict selected cases passed, including concurrent
+processes, shared handles, metadata and directory operations, clean remounts,
+both clean handoff directions and original `TRST` replay. Independent amidisk
+extraction and deep checks passed. The portable core passed 203 host tests;
+one optional external-image case was skipped. Host semantic tests and compiled
+native execution are distinct coverage.
+
+All 329 unsampled sector-write and flush interruption/reboot cases passed,
+with no failed case or disk-operation index: 98 buffered, 107 strict and 62
+original-handler cuts repeated for each comparison. Cuts included individual
+512-byte sectors inside combined device requests. Each image was recovered by
+the handler that wrote it. CopperSFS recovered permitted old-or-new data;
+strict create followed by write can also preserve the separately committed
+empty file. No unresolved `CSUN` transaction was passed to original SFS.
+The model assumes atomic 512-byte sectors, honored flush barriers and loss of
+unflushed writes. Torn sectors, controllers that misorder flushes and physical
+hardware remain unqualified.
+
+The same immutable 16 MiB `SFS\0` base image, SHA-256
+`36119C09B6480AD11A748EA011774F2A4F30E9659C0A9FC03E13FA4747983ED1`,
+and original 1.279 handler, SHA-256
+`C7DD174131035A0F5845BE1076FB5C55642F6AA2125D4B5D8C029B141DCC8205`,
+were used throughout. Each run started from a fresh clone. The shared emulator
+profile used Kickstart 3.1, 68020, 512 KiB chip RAM, 2 MiB fast RAM, the
+unchanged default 512 KiB slow RAM, 32 mount buffers and 512-byte sectors.
+Geometry was two surfaces, 32 blocks per track, cylinders 0-511, two reserved
+blocks and start offset zero, with Mask `0x7FFFFFFF` and MaxTransfer `0x1FE00`.
+Independent checks used amidisk revision
+`a4faa7b36bd7c005371d9bb509a936a13d58b43f`. Boot and image-copy time were
+excluded from CPU measurements. Both handlers used the same mount buffer
+count, but CopperSFS additionally allocated its clean-data pool; these results
+are not normalized to equal total memory use.
+
+The preceding CopperSFS baseline in this section is the qualified recycling
+build, SHA-256 `B9E693A330E609ECFAE43FB8847EFFD0FF2F04581AE4AADFD34B715246F1E828`.
+It was qualified between preview.3 and this cache update. Historical preview.3
+results are preserved in the separate section below.
+
+Five trials per handler and workload gave these median guest CPU cycles for
+the **default buffered 68020** build. The request column counts device reads,
+writes and flushes. All six workloads retained the preceding CopperSFS build's
+sector and device-request counts.
+
+| Workload | Current CopperSFS cycles | Original 1.279 cycles | Requests, CopperSFS / original |
+| --- | ---: | ---: | ---: |
+| Sequential 1 MiB read | 2,046,949 | 2,551,011 | 128 / 128 |
+| Sequential 1 MiB write | 13,545,310 | 14,419,570 | 136 / 136 |
+| Small-file creation | 9,339,180 | 10,376,190 | 15 / 17 |
+| Directory enumeration | 6,231,920 | 7,839,441 | 0 / 0 |
+| Mixed access | 9,267,560 | 9,358,840 | 15 / 15 |
+| Repeated 1 MiB streaming read | 2,036,140 | 2,580,020 | 128 / 128 |
+
+The separate 64 KiB cache working-set comparison ran 30 trials: original,
+preceding CopperSFS and preview.4, each cold and fully warm, five trials per
+group. Sixteen 4 KiB reads were issued per pass. A first sequential pass was
+observed without admission, the reread admitted data, and the third pass was
+fully warm. The cache has no speculative read-ahead.
+
+| 64 KiB working set | Preceding CopperSFS | Preview.4 CopperSFS | Original 1.279 |
+| --- | ---: | ---: | ---: |
+| Cold median cycles | 320,899 | 321,670 | 677,031 |
+| Cold read requests | 16 | 16 | 8 |
+| Fully warm median cycles | 306,630 | 607,690 | 696,641 |
+| Fully warm read requests | 16 | 0 | 8 |
+
+The cold pass added 0.24% CPU versus the preceding build, with unchanged
+requests. Warm cache hits removed all 128 sector reads, while RAM copying
+consumed 98.18% more guest CPU than the preceding direct emulated-I/O path.
+The warm preview.4 run used 12.77% fewer cycles than original SFS. The 1 MiB
+streaming workload exceeds the cache and intentionally continues to read the
+device. These are emulator CPU and I/O counts, not physical-device throughput.
+
+The default pool stores 256 KiB of file data in 262,688 bytes, including 544
+bytes of bookkeeping. At 512-byte blocks, the 68020 loaded-and-mounted Fast
+RAM consumption was 321,440 bytes with cache disabled, 452,808 at 128 KiB,
+584,136 at the default 256 KiB, and 846,792 at 512 KiB. The 2 MiB request
+fell back to 1 MiB in available contiguous Fast RAM, with a measured total of
+1,372,104 bytes. The strict default measured 533,632 bytes. These snapshots
+include handler code, process and mount allocations; they are not peak memory
+with additional open files. The cache falls back by halving its page count on
+allocation failure, eventually running uncached if needed. `ADDBUFFERS`
+controls a separate block cache. See [cache behavior](data-cache.md).
+
+The disabled, 128 KiB, 512 KiB and 2 MiB-requested variants passed memory
+and cache-coherence checks, including buffered overwrites, truncate,
+delete/recreate, byte extraction and clean remount. They did **not** receive
+the full A/B correctness, performance or exhaustive recovery qualification.
+The full 2 MiB allocation was not exercised on this machine.
+The 68000 HUNK passed five mount/shared-workload smoke cases on the 68020
+emulator profile. That is compiled 68000-code coverage, not a complete 68000
+Kickstart boot or physical 68000 qualification. Strict performance is outside
+the measurements above.
+
+The clean-data cache contains no recovery state. Reads consult pending writes
+before cached clean bytes; mutations, physical writes, recovery and handoff
+invalidate it. A miss preserves the original contiguous device transfer,
+avoiding extra requests around partially cached data. The cache does not alter
+the undo journal, flush ordering or buffered/strict durability policies. See
+[buffering and recovery](transaction-batching.md).
+
+## Previous preview.3 package identity and qualification
 
 The `v0.1.0-preview.3` packages use the exact handler bytes qualified below,
 without rebuilding or modifying them for release. The 68020 ZIP contains the
 buffered `CopperSFS` and optional `CopperSFS-strict`; the separate 68000 ZIP
 contains the buffered compatibility build. Its coverage remains the limited
 68000-HUNK-on-68020 checks stated below, not the 68020 recovery/performance
-qualification. The [release manifest](../packaging/v0.1.0-preview.3.json)
+qualification. The [historical release manifest](https://github.com/ilehtoranta/CopperSFS/blob/v0.1.0-preview.3/packaging/v0.1.0-preview.3.json)
 records sizes and SHA-256 hashes. Each ZIP includes the same manifest as
 `RELEASE.json`, installation instructions, a mount example and file checksums.
-See [installation and upgrade](handler-install.md) before selecting a variant.
+See the [historical installation guide](https://github.com/ilehtoranta/CopperSFS/blob/v0.1.0-preview.3/docs/handler-install.md)
+for that release.
 
 ## Compact queue and write CPU qualification, 2026-10-22
 
