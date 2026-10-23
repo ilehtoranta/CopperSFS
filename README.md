@@ -47,6 +47,10 @@ filesystem flush makes the checkpoint durable. Recent unflushed changes may
 be lost after a crash. Both policies use the same recovery protocol. See
 [buffering and integration](docs/transaction-batching.md).
 
+An optional caller-owned [clean-data cache](docs/data-cache.md) can retain file
+data without adding device requests or changing durability. Integrators control
+its memory budget, admission policy and invalidation.
+
 ## Build and test
 
 Install .NET 10 and clone the public
