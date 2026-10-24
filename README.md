@@ -2,21 +2,21 @@
 
 CopperSFS is an experimental, allocation-free implementation of the classic
 Amiga Smart File System on-disk format (`SFS\0`). This repository contains the
-portable filesystem core and its host tests.
+portable filesystem core, its host tests and the CopperSFSCtrl command source.
 
-**Status: experimental preview.** [Preview.4](https://github.com/ilehtoranta/CopperSFS/releases/tag/v0.1.0-preview.4)
-provides a buffered 68020 handler with a 256 KiB clean-data cache, optional
-68020 binaries with other cache sizes or strict writes, and a separate 68000
-compatibility package with limited validation. Select the package for your CPU
-and read the [installation and upgrade guide](docs/handler-install.md).
+**Status: experimental.** [CopperSFS 1.0](https://github.com/ilehtoranta/CopperSFS/releases/tag/v1.0)
+provides one configurable 68020+ handler and CopperSFSCtrl. The default is
+buffered writes with a 256 KiB clean-data cache. Query allocations, resize or
+disable the cache, switch write mode and perform a checked filesystem flush
+on a mounted volume. Read the [installation and runtime settings](docs/handler-install.md).
 The handler integration source is not part of this repository. The external
 handler has been compared with
 original SmartFilesystem 1.279 under Kickstart 3.1, including clean handoff and
-write/flush interruption sweeps. Source changes and published preview binaries
+write/flush interruption sweeps. Source changes and published binaries
 have separate qualification records: see [validation](docs/validation.md).
 Other ROM versions and physical hardware remain unqualified. Use only a
 disposable volume with an independent backup. Buffered writes are the default
-in preview.4; recent unflushed changes may be lost after a crash.
+in 1.0; recent unflushed changes may be lost after a crash.
 
 ## What is here
 
@@ -26,6 +26,8 @@ in preview.4; recent unflushed changes may be lost after a crash.
 - `tests/CopperSFS.Core.Tests`: semantic tests for traversal, mutation,
   interleaved file operations, interrupted writes, recovery and sparse volumes
   larger than 4 GiB.
+- `tools/CopperSFSCtrl`: native AmigaDOS configuration command using the
+  versioned [filesystem control protocol](docs/control-protocol.md).
 
 Public types use the `CopperSFS` namespace. Integrators supply their own block
 device and guest-memory adapter through the platform interfaces.
