@@ -50,8 +50,8 @@ be lost after a crash. Both policies use the same recovery protocol. See
 [buffering and integration](docs/transaction-batching.md).
 
 An optional caller-owned [clean-data cache](docs/data-cache.md) can retain file
-data without adding device requests or changing durability. The packaged 68020
-handlers offer fixed cache budgets; choose the executable in the
+data without adding device requests or changing durability. The configurable 68020
+handler includes CopperSFSCtrl for per-volume cache and write-mode settings; see the
 [installation guide](docs/handler-install.md). Integrators control memory,
 admission and invalidation in their own adapters.
 

@@ -12,47 +12,44 @@ CopperSFS 1.0 is an experimental AmigaDOS filesystem handler for classic
 Smart File System (SFS\0) volumes. It is an independent implementation of
 the filesystem originally developed by John Hendrikx.
 
-This package contains the filesystem handler and documentation, without
-additional filesystem tools. Install CopperSFS as L:CopperSFS on a
-separate boot volume.
+The package contains one 68020+ filesystem handler, the CopperSFSCtrl
+command and documentation. Install CopperSFS as L:CopperSFS on a separate
+boot volume, and CopperSFSCtrl in C:.
 
-This package requires a 68020 or newer CPU. Every included executable uses
-the 68020 instruction set. Use disposable test volumes with independent
-backups. Physical devices and other ROM configurations remain unqualified.
-Device access beyond 4 GiB requires TD64. NSD is not supported; native
-large-device use remains unqualified.
+Use disposable test volumes with independent backups. Physical devices and
+other ROM configurations remain unqualified. Device access beyond 4 GiB
+requires TD64. NSD is not supported; native large-device use remains
+unqualified.
 
-The default handler uses buffered writes and a 256 KiB clean-data cache.
-Recent unflushed changes may be lost after a crash. The optional strict
-handler commits each successful mutation before replying. Both modes use
-the same recovery journal and ordered flush barriers. Recover interrupted
-CSUN transactions with CopperSFS before using another filesystem handler.
+The default is buffered writes with a 256 KiB clean-data cache. Configure
+each mounted volume without replacing the handler:
+  CopperSFSCtrl SFS0: INFO
+  CopperSFSCtrl SFS0: DATACACHE 128K
+  CopperSFSCtrl SFS0: DATACACHE OFF
+  CopperSFSCtrl SFS0: WRITEMODE STRICT
+  CopperSFSCtrl SFS0: WRITEMODE BUFFERED
+  CopperSFSCtrl SFS0: FLUSH
 
-Cache capacity is selected by executable, not by a mount flag:
-  CopperSFS                 buffered, 256 KiB (default)
-  CopperSFS-strict          strict,   256 KiB
-  Variants/CopperSFS-cache0   buffered, disabled
-  Variants/CopperSFS-cache128 buffered, 128 KiB
-  Variants/CopperSFS-cache512 buffered, 512 KiB
-  Variants/CopperSFS-cache2048 buffered, 2 MiB requested
+Settings last for the mount. Boot-time preferences can be applied from
+S:User-Startup after mounting. Cache changes preserve open handles and
+pending writes. Mode changes checkpoint first; a failed change leaves the
+previous mode active. FLUSH checks filesystem checkpoint success.
 
-The pool falls back to smaller allocations or uncached reads when needed.
-ADDBUFFERS controls a different cache. Default loaded-and-mounted memory
-measured about 570 KiB on the test profile; INSTALL.txt gives full figures.
+Recent unflushed buffered changes may be lost after a crash. Strict mode
+commits each successful mutation before replying. Both use the same
+recovery journal and ordered flush barriers. Recover interrupted CSUN
+transactions with CopperSFS before using another filesystem handler.
 
-The underlying default and strict code was A/B tested against the 68k
-SmartFilesystem 1.279 from Joerg Strohmayer's development branch under
-Kickstart 3.1, including concurrent reads/writes, independent disk checks
-and 329 interrupted-write/recovery cases across
-both implementations. Version stamping preserves all original code/data
-and relocations. These new binary hashes have not received a new full A/B
-sweep. The 1.0 default passed native Version 40.3 identification/date and
-mount/read checks. Alternate cache builds have narrower qualification.
-Read VALIDATION.txt for the exact coverage and crash-model limits.
+The default loaded-and-mounted memory measured 585,480 bytes in the test
+profile. INFO shows actual allocations; INSTALL.txt explains cache sizes,
+allocation failures, startup settings and durability.
 
-Read INSTALL.txt before installing or changing the selected executable.
-Verify files against SHA256SUMS.txt on a host with SHA-256 support.
-CopperSFS is distributed under the MIT license in LICENSE.txt.
+Comparison testing uses 68k SmartFilesystem 1.279 from Joerg Strohmayer's
+development branch under Kickstart 3.1. See VALIDATION.txt and RELEASE.json
+for the exact qualified hashes, recovery coverage and crash-model limits.
+
+Read INSTALL.txt before installation. Verify files against SHA256SUMS.txt
+on a host with SHA-256 support. CopperSFS uses the MIT license in LICENSE.txt.
 Native handler integration source is not included.
 
 Report reproducible problems at the public repository, including handler

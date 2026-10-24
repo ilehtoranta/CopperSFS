@@ -1,5 +1,14 @@
 # Validation boundary
 
+## Configurable 1.0 handler, 2026-10-24
+
+The current package uses one configurable 68020 handler and CopperSFSCtrl.
+Its new hashes received the full A/B rerun: 13 buffered cases, seven
+strict-initial cases, 329 exhaustive recovery cuts, 40 mode-switch cuts and
+90 cold/warm performance trials. Read the [current qualification](../packaging/aminet-1.0/VALIDATION.txt)
+and [runtime installation settings](handler-install.md). The sections below
+are the historical preview qualification.
+
 ## Preview.4 package identity and clean-data cache, 2026-10-23
 
 The `v0.1.0-preview.4` packages contain exact qualified HUNK bytes without

@@ -52,7 +52,9 @@ Storage is `32 + pages * (16 + 16 * blockBytes)` bytes. With 512-byte blocks:
 
 These figures exclude the existing metadata cache, write-back and transaction
 buffers, physical write queue, filesystem state and loaded code. Four-way set
-collisions and page alignment can reduce effective capacity. Allocation failure
-must fall back to fewer pages or uncached reads without changing durability or
-making an otherwise valid volume unmountable. Cache copies support ordinary RAM;
+collisions and page alignment can reduce effective capacity. At mount, allocation failure
+falls back to fewer pages or uncached reads without changing durability or
+making an otherwise valid volume unmountable. Explicit runtime resizing instead
+requires the exact requested pool and preserves the old pool on failure; see
+[handler settings](handler-install.md). Cache copies support ordinary RAM;
 the physical transfer layer retains responsibility for DMA restrictions.
