@@ -17,6 +17,26 @@ public static partial class AmigaSmartFileSystemWriteCore
     private static APTR Edit<T>(ref T p, ref Work w, uint block, uint id, APTR scratch)
         where T : struct, IAmigaWritableFileSystemPlatform
     {
+        if (w.RedoStaging)
+        {
+            var arena = p.RedoOverlay;
+            var retained = AmigaSmartFileSystemRedoArena.MetadataView(ref p, arena, block, id, true, out var found);
+            if (!found)
+            {
+                var original = View(ref p, ref w, block, id, scratch);
+                // Copy the verified view directly into our owned arena before
+                // any further block I/O can expire it. Avoid the scratch copy.
+                if (original.IsNull || block < w.ReservedBlocks || block >= w.BlockCount - 1 ||
+                    !AmigaSmartFileSystemRedoArena.Store(ref p, arena, block, original))
+                { FailUnlessSet(ref w); return APTR.Null; }
+                retained = AmigaSmartFileSystemRedoArena.Find(ref p, arena, block);
+            }
+            else if (retained.IsNull)
+            { Fail(ref w, DOS.Error.DiskNotValidated); return APTR.Null; }
+            // The entire arena is private until publication. Every caller seals
+            // and publishes this image before another metadata access.
+            return retained;
+        }
         if (w.Buffered.IsNull || !w.JournalActive || w.BufferCommitting)
             return Read(ref p, ref w, block, id, scratch) ? scratch : APTR.Null;
         var slot = AmigaSmartFileSystemWriteBuffer.Find(ref p, w.Buffered, w.BlockBytes, block);

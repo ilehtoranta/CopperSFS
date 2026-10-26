@@ -1,5 +1,10 @@
 # CopperSFS
 
+Current source includes bounded TRST transactions and legacy CSUN recovery.
+See [the mainline integration notes](docs/trst-mainline-integration.md) for
+atomicity, durability policy and validation scope. Released packages retain
+their separately documented build and qualification identities.
+
 CopperSFS is an experimental, allocation-free implementation of the classic
 Amiga Smart File System on-disk format (`SFS\0`). This repository contains the
 portable filesystem core and its host tests.

@@ -6,6 +6,32 @@ namespace CopperSFS.Tests;
 public sealed partial class AmigaSmartFileSystemTests
 {
     [Fact]
+    public void SequentialAlignedReadsUseTheSameExtentAndResetAfterFailure()
+    {
+        var disk = new Disk(Image());
+        var cursor = new AmigaSmartFileSystemCore.ReadCursor();
+        var metadata = APTR.FromPointer(512); var data = APTR.FromPointer(1024);
+        Assert.Equal(512, AmigaSmartFileSystemCore.Read(ref disk, ref cursor, 3, 0,
+            APTR.FromPointer(4000), 512, metadata, data, out var error));
+        Assert.Equal(DOS.Error.None, error);
+        Assert.Equal(512, AmigaSmartFileSystemCore.Read(ref disk, ref cursor, 3, 512,
+            APTR.FromPointer(4512), 512, metadata, data, out error));
+        Assert.Equal(DOS.Error.None, error);
+        for (var index = 0; index < 1024; index++)
+            Assert.Equal((byte)(index * 17), disk.Ram[4000 + index]);
+        Assert.Equal(new[] { (20u, 1u), (21u, 1u) }, disk.DataReads);
+
+        var failing = new Disk(Image()) { FailReadBlock = 21 };
+        cursor = new AmigaSmartFileSystemCore.ReadCursor();
+        Assert.Equal(512, AmigaSmartFileSystemCore.Read(ref failing, ref cursor, 3, 0,
+            APTR.FromPointer(4000), 512, metadata, data, out error));
+        Assert.Equal(-1, AmigaSmartFileSystemCore.Read(ref failing, ref cursor, 3, 512,
+            APTR.FromPointer(4512), 512, metadata, data, out error));
+        Assert.Equal(DOS.Error.DiskNotValidated, error);
+        Assert.Equal(0u, cursor.Node);
+    }
+
+    [Fact]
     public void BulkReadReportsOnlyTheCompletedPrefixAfterADeviceFailure()
     {
         var disk = new Disk(Image()) { FailReadBlock = 21 };

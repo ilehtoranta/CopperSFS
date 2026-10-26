@@ -11,12 +11,6 @@ isolate the view/compiler change using frozen adapter inputs and a paired core
 snapshot. This is not a package release or qualification of unrelated source
 changes being developed concurrently.
 
-The source commits were subsequently isolated onto the published compiler base,
-including the required pointer-wrapper folding prerequisite. That clean source
-build is checked separately with focused compiler and portable-core tests. The
-native A/B figures below apply to the recorded development compiler and handler
-hashes; they do not qualify a handler rebuilt with the isolated compiler branch.
-
 ## Candidate and fixture identities
 
 | Handler | Bytes | SHA-256 |

@@ -14,7 +14,7 @@ public static class AmigaFileSystemBlockIo
     }
 
     public static bool ValidateMetadata<T>(ref T p, uint block, uint id, APTR data, uint bytes)
-        where T : struct, IAmigaFileSystemPlatform =>
+        where T : struct, IAmigaGuestMemory =>
         p.ReadUInt32(data) == id && p.ReadUInt32(data, 8) == block &&
         AmigaSmartFileSystemCore.BlockSum(ref p, data, bytes) == uint.MaxValue;
 
