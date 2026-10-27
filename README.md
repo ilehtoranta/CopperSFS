@@ -4,6 +4,8 @@ Current source includes bounded TRST transactions and legacy CSUN recovery.
 See [the mainline integration notes](docs/trst-mainline-integration.md) for
 atomicity, durability policy and validation scope. Released packages retain
 their separately documented build and qualification identities.
+The [Write latency and checkpoint report](docs/trst-latency.md) records the
+current optimization, its percentile tradeoff and compiled-handler checks.
 
 CopperSFS is an experimental, allocation-free implementation of the classic
 Amiga Smart File System on-disk format (`SFS\0`). This repository contains the
@@ -42,10 +44,11 @@ The engine does not format volumes. It uses classic 32-bit AmigaDOS file sizes
 and seek positions. A partition above 4 GiB additionally needs a block device
 with TD64 or NSD 64-bit I/O; block-device integration is outside this core.
 
-CopperSFS writes a private `CSUN` undo journal. If power is lost during a
-CopperSFS mutation, remount with CopperSFS to recover it before exposing the
-volume through another SFS implementation. Recovery requires a writable device
-and an intact journal. See [compatibility and recovery](docs/compatibility.md).
+The core provides original-format `TRST` and legacy `CSUN` journals. Current
+classic standalone builds default to buffered TRST with whole-Write atomicity.
+An interrupted legacy CSUN transaction still needs CopperSFS recovery before
+the volume is exposed through another SFS implementation. Recovery requires a
+writable device and an intact journal. See [compatibility and recovery](docs/compatibility.md).
 
 Integrators can select bounded buffered writes or strict per-operation
 durability. Buffered changes are immediately visible to readers; an explicit

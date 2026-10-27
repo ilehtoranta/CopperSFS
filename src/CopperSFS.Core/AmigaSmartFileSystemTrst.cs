@@ -200,9 +200,32 @@ public static partial class AmigaSmartFileSystemWriteCore
     // existing Bitmap scratch. Journal allocation uses Meta, so page crossings
     // cannot clobber the plan. Old/final words are never classified a second time.
     private static bool TrstEmit<T>(ref T p, ref Work w, ref RedoPlatform<T> staged,
-        ref RedoStream stream, APTR image, uint runs)
+        ref RedoStream stream, APTR image, uint runs, uint length)
         where T : struct, IAmigaWritableFileSystemPlatform
     {
+        // Plan already computed the complete payload length. When it fits,
+        // emit into the bounded current page without a page-transition call
+        // for every run. This path performs no I/O and changes no publication
+        // barrier; spanning payloads retain the streaming path below.
+        if (stream.Offset <= w.BlockBytes && length <= w.BlockBytes - stream.Offset)
+        {
+            var source = image.Raw;
+            var destination = w.Journal.Raw + stream.Offset;
+            for (var run = 0u; run < runs; run++)
+            {
+                var code = p.ReadUInt8(w.Bitmap, (int)run);
+                var bytes = ((uint)(code & 63) + 1) * 4;
+                p.WriteUInt8(APTR.FromPointer(destination++), 0, code);
+                if ((code >> 6) == 3)
+                {
+                    p.Copy(APTR.FromPointer(source), APTR.FromPointer(destination), bytes);
+                    destination += bytes;
+                }
+                source += bytes;
+            }
+            stream.Offset += length;
+            return true;
+        }
         var pointer = image.Raw;
         for (var run = 0u; run < runs; run++)
         {
@@ -278,7 +301,7 @@ public static partial class AmigaSmartFileSystemWriteCore
                     if (!TrstByte(ref p, ref w, ref staged, ref stream, (byte)(target >> shift))) return false;
                 if (!TrstByte(ref p, ref w, ref staged, ref stream, 0)) return false;
             }
-            if (!TrstEmit(ref p, ref w, ref staged, ref stream, image, runs)) return false;
+            if (!TrstEmit(ref p, ref w, ref staged, ref stream, image, runs, length)) return false;
             // Native OperationInformation uses 68k word alignment (7-byte header).
             if ((length & 1) == 0 && !TrstByte(ref p, ref w, ref staged, ref stream, 0)) return false;
         }

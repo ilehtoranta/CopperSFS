@@ -6,14 +6,24 @@ file and directory mutation and metadata updates. It validates original SFS
 `TRST` redo records on mount and replays complete records before exposing
 the volume.
 
-Its own mutations use `CSUN` undo records, explicit flush barriers and a
+Current classic standalone builds default to buffered original-format TRST.
+Metadata redo records publish payload written into previously unpublished
+replacement space, preserving whole-Write atomicity. The native staging budget
+is bounded at 192 KiB. Successful Writes are visible before they are durable;
+Flush, Close, Inhibit and timer commit establish durability. Crash recovery and
+original SFS 1.279 compatibility are qualified for the exact compiled binaries
+in the [latency report](trst-latency.md), within its stated device assumptions.
+Core integrators use `WriteTrstGroup` and `FlushTrstGroup` for grouped TRST writes;
+this is separate from the legacy `Work.Buffered` API below.
+
+Legacy CSUN mutations use `CSUN` undo records, explicit flush barriers and a
 commit marker. This journal is private to CopperSFS. An interrupted CopperSFS
 write needs CopperSFS recovery; the original SFS handler should not be
 expected to interpret `CSUN`. A damaged journal remains dirty rather than
 being silently accepted. The journal reserves free blocks temporarily, so a
 mutation can report a full disk before every free data block is consumed.
 
-An optional bounded write buffer groups successful mutations into a checkpoint.
+The legacy optional bounded write buffer groups successful mutations into a checkpoint.
 Readers see pending changes immediately; a crash can lose changes since the
 last successful filesystem flush. A failed operation rolls back its own RAM
 changes without discarding earlier successful operations. Leaving

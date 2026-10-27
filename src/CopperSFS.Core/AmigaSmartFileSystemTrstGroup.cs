@@ -72,8 +72,16 @@ public static partial class AmigaSmartFileSystemWriteCore
     /// accepted Write together. On failure the prior accepted view is retained.
     /// Capacity failure never publishes a prefix; callers may flush that prior
     /// group and retry the whole request. Other operations require a group flush.
+    /// Eager continuation prepares an optional next-Write proof. Disabling it
+    /// leaves the accepted Write fully admitted; the next Write builds its proof
+    /// through the existing checked fallback, spreading cold-path work.
     /// All volume access must remain serialized and observe RedoOverlay.</summary>
     public static bool WriteTrstGroup<T>(ref T p, ref Work w, ref Request r, APTR group, out uint actual)
+        where T : struct, IAmigaWritableFileSystemPlatform =>
+        WriteTrstGroup(ref p, ref w, ref r, group, out actual, eagerContinuation: true);
+
+    /// <summary>Accept a complete Write, optionally preparing the next continuation eagerly.</summary>
+    public static bool WriteTrstGroup<T>(ref T p, ref Work w, ref Request r, APTR group, out uint actual, bool eagerContinuation)
         where T : struct, IAmigaWritableFileSystemPlatform
     {
         actual = 0; w.Error = DOS.Error.None; w.TrstObjectHint = APTR.Null; w.TrstContinuation = APTR.Null;
@@ -144,7 +152,7 @@ public static partial class AmigaSmartFileSystemWriteCore
         if (success)
         {
             success = TrstGroupHasJournalSpace(ref p, ref w, group, next, out var continuationSafe);
-            if (success && continuationSafe && p.ReadUInt32(group, TrstGroupContinuation) != 0)
+            if (eagerContinuation && success && continuationSafe && p.ReadUInt32(group, TrstGroupContinuation) != 0)
             {
                 // The conservative admission covers every future allocation in
                 // the touched maps. Construct the next window while that exact
