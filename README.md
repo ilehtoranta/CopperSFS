@@ -4,8 +4,8 @@ Current source includes bounded TRST transactions and legacy CSUN recovery.
 See [the mainline integration notes](docs/trst-mainline-integration.md) for
 atomicity, durability policy and validation scope. Released packages retain
 their separately documented build and qualification identities.
-The [Write latency and checkpoint report](docs/trst-latency.md) records the
-current optimization, its percentile tradeoff and compiled-handler checks.
+The [Write tail and p95 report](docs/trst-tail-latency.md) records the current
+optimization, its checkpoint tradeoff and compiled-handler checks.
 
 CopperSFS is an experimental, allocation-free implementation of the classic
 Amiga Smart File System on-disk format (`SFS\0`). This repository contains the

@@ -1,5 +1,8 @@
 # TRST Write-tail and checkpoint optimization
 
+Historical qualification. The [follow-up](trst-tail-latency.md) reduces the
+remaining overwrite tail and corrects the p95 regression reported below.
+
 The compiled buffered handler reduces worst observed existing-file overwrite
 Write latency from 31.274 to 29.062 ms (7.1%) and final checkpoint time from
 32.677 to 29.827 ms (8.7%). It retains the 192 KiB staging cap, whole-Write

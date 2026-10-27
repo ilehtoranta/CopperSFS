@@ -2,7 +2,7 @@
 
 Current mainline TRST source and compiled-handler qualification are recorded in
 [the integration notes](trst-mainline-integration.md) and
-[the latency report](trst-latency.md). The package records below describe their
+[the tail/p95 report](trst-tail-latency.md). The package records below describe their
 own earlier binary identities; they are not replaced by the source update.
 
 ## Preview.4 package identity and clean-data cache, 2026-10-23
