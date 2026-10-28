@@ -26,6 +26,7 @@ public sealed partial class AmigaSmartFileSystemTests
         public APTR RedoOverlay { get; set; }
         public readonly List<(uint Block, uint Count)> PhysicalWrites = [];
         public bool Buffered;
+        public bool ReadOnly;
         public bool RequireAlignedBlockBuffers;
         public bool CheckReadOnlyViews;
         public bool ReturnScratchMetadataViews;
@@ -116,7 +117,7 @@ public sealed partial class AmigaSmartFileSystemTests
             else image.AsSpan((int)block * Bytes, Bytes).CopyTo(Ram.AsSpan((int)destination.Raw, Bytes));
             return true;
         }
-        public bool WriteProtected() => Protected;
+        public bool WriteProtected() => ReadOnly || Protected;
         public bool Flush()
         {
             if (RedoOverlay.IsNotNull) return true;

@@ -32,6 +32,40 @@ public static class AmigaSmartFileSystemTrstCodec
             // input word is still read exactly once, including alternating runs.
             if (kind == 1)
             {
+                // Four guarded pairs share one loop-control comparison.
+                // Each input word is still read once, and the first mismatch
+                // remains the carried first word of the following run.
+                while (limit - count >= 4)
+                {
+                    {
+                        oldAt += 4; finalAt += 4;
+                        var nextValue = p.ReadUInt32(APTR.FromPointer(finalAt));
+                        var nextOld = p.ReadUInt32(APTR.FromPointer(oldAt));
+                        if (nextValue != nextOld) { value = nextValue; old = nextOld; goto UnchangedDone; }
+                        count++;
+                    }
+                    {
+                        oldAt += 4; finalAt += 4;
+                        var nextValue = p.ReadUInt32(APTR.FromPointer(finalAt));
+                        var nextOld = p.ReadUInt32(APTR.FromPointer(oldAt));
+                        if (nextValue != nextOld) { value = nextValue; old = nextOld; goto UnchangedDone; }
+                        count++;
+                    }
+                    {
+                        oldAt += 4; finalAt += 4;
+                        var nextValue = p.ReadUInt32(APTR.FromPointer(finalAt));
+                        var nextOld = p.ReadUInt32(APTR.FromPointer(oldAt));
+                        if (nextValue != nextOld) { value = nextValue; old = nextOld; goto UnchangedDone; }
+                        count++;
+                    }
+                    {
+                        oldAt += 4; finalAt += 4;
+                        var nextValue = p.ReadUInt32(APTR.FromPointer(finalAt));
+                        var nextOld = p.ReadUInt32(APTR.FromPointer(oldAt));
+                        if (nextValue != nextOld) { value = nextValue; old = nextOld; goto UnchangedDone; }
+                        count++;
+                    }
+                }
                 while (count < limit)
                 {
                     oldAt += 4; finalAt += 4;
@@ -40,6 +74,7 @@ public static class AmigaSmartFileSystemTrstCodec
                     if (nextValue != nextOld) { value = nextValue; old = nextOld; break; }
                     count++;
                 }
+            UnchangedDone:;
             }
             else if (kind == 0)
             {

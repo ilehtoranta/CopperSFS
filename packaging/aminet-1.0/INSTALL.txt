@@ -1,0 +1,92 @@
+CopperSFS 1.0 - installation and cache settings
+============================================
+
+EXPERIMENTAL. Use a disposable existing SFS\0 volume and independent backups.
+All executables in this package require a 68020 or newer CPU.
+AmigaOS 2.04+ is required; testing used Kickstart 3.1. Physical devices,
+other ROMs and native partitions above 4 GiB remain unqualified.
+
+1. Extract CopperSFS.lha with an LhA-compatible archiver. The archive uses
+   standard level-0, stored (-lh0-) entries. Keep directory paths when
+   extracting. The short CopperSFS drawer fits classic FFS name limits.
+   Verify the outer CopperSFS.lha.sha256 and internal SHA256SUMS.txt using
+   a host SHA-256 tool. These are not AmigaDOS Sum-format files.
+
+2. Finish all work on the test volume with its current handler. Close files
+   and stop applications using it. Use software that sends filesystem
+   ACTION_FLUSH and checks success, or performs a successful clean Inhibit.
+   Closing files, dos.library/Flush(file), waiting or an idle activity light
+   do not confirm a filesystem checkpoint. A flush utility is not supplied.
+
+3. If the previous session crashed, recover its CSUN transaction with
+   CopperSFS on a writable device first. Preserve the image if recovery
+   fails. Never expose an unresolved CSUN transaction to another SFS handler.
+
+4. Boot from a separate volume with the test volume unmounted. Back up the
+   old handler. Replacing L:CopperSFS does not replace a running handler.
+   Never mount the same partition simultaneously through two handlers.
+
+5. From the extracted CopperSFS drawer, select ONE executable:
+
+     Copy CopperSFS L:CopperSFS
+
+   Or strict writes:
+     Copy CopperSFS-strict L:CopperSFS
+
+   Or a smaller buffered cache:
+     Copy Variants/CopperSFS-cache128 L:CopperSFS
+
+   Always install the selected file under the name L:CopperSFS.
+   Cache settings and strict mode are fixed in that executable.
+
+6. Copy SFS0.mount.example to DEVS:DOSDrivers/SFS0 on OS 2.1+, or create an
+   equivalent DEVS:MountList entry on OS 2.04. Replace EVERY CHANGE_ME with
+   the existing partition's exact device, unit and geometry. Check Mask,
+   MaxTransfer, SizeBlock, Reserved and SectorsPerBlock. SizeBlock counts
+   longwords; a 512-byte block normally uses 128. Do not copy test geometry.
+   FileSystem = L:CopperSFS, DosType = 0x53465300 and Forceload = 1 select
+   this handler. Do not format the partition.
+
+7. Mount SFS0: and List SFS0:. Write/read a small test file. Complete a
+   checked filesystem flush or clean inhibit, reboot from the separate
+   boot volume, remount and verify the bytes again.
+
+Cache budgets (512-byte filesystem blocks, 68020 test profile)
+-----------------------------------------------------------
+Executable          Data budget  Pool bytes  Loaded + mounted RAM
+cache0              disabled             0       321,440 bytes
+cache128            128 KiB        131,360       452,808 bytes
+default             256 KiB        262,688       584,136 bytes
+cache512            512 KiB        525,344       846,792 bytes
+cache2048           2 MiB        2,101,280     see fallback below
+strict              256 KiB        262,688       533,632 bytes
+
+The pool uses contiguous Fast RAM. Allocation failure halves its page count
+until a pool fits, eventually running uncached. The 2 MiB build obtained a
+1 MiB pool in testing, measuring 1,372,104 bytes loaded and mounted. Full
+2 MiB allocation remains unqualified. Figures include code, process, stack
+and mount buffers; additional open files need memory. Each mounted volume
+has its own pool. ADDBUFFERS does not resize this clean-data pool.
+
+An initial sequential pass does not fill the cache. A reread or seek on
+the same open handle enables admission; a later pass can hit. Reopening
+alone does not seed an empty pool. Requests of at least 8 KiB from files
+larger than the actual pool bypass it. Writes, recovery and handoff
+invalidate cached data. It adds no speculative device reads or dirty data.
+
+Durability and identification
+----------------------------
+Buffered writes checkpoint after five seconds from the first pending
+change, at buffer pressure, on successful filesystem ACTION_FLUSH, or
+before successful clean inhibit. Pending writes are visible to readers.
+Recent unflushed changes can be lost in a crash. Buffer/timer allocation
+failure falls back to strict writes. Strict mode commits each successful
+mutation, but does not make multiple application operations atomic.
+
+Use Version L:CopperSFS FILE FULL. The tag identifies version, CPU, policy
+and requested cache capacity, not the smaller pool actually allocated.
+Version SFS0: lookup is not added.
+
+Compatibility, benchmarks and recovery limits are in VALIDATION.txt.
+The handler uses classic 32-bit DOS file sizes and seek positions. TD64/NSD
+is additionally required beyond 4 GiB; native large-device use is unqualified.

@@ -23,7 +23,9 @@ public static partial class AmigaSmartFileSystemWriteCore
             var count = w.BlockBytes == 512 ? r.Length >> 9 : r.Length / w.BlockBytes;
             if (!BuildTrstProof(ref p, ref w, group, active, hint, p.ReadUInt32(hint, 8),
                 p.ReadUInt32(hint, 16) + p.ReadUInt32(hint, 20), count, out var ready)) return false;
-            if (ready) success = ContinueTrstWriteReady(ref p, ref pending, ref r, group, active, out handled, out _);
+            // Start the already-proved run at this Write, so the next Write can
+            // use its sealed bounds without first materializing this update.
+            if (ready) success = ContinueTrstWriteReady(ref p, ref pending, ref r, group, active, out handled, out _, deferUpdates: true);
             else success = ContinueTrstBoundary(ref p, ref w, ref pending, ref r, group, active, count, out handled);
         }
         if (!success && pending.Error != DOS.Error.None) w.Error = pending.Error;

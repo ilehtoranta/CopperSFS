@@ -40,13 +40,18 @@ public static partial class AmigaSmartFileSystemWriteCore
             p.WriteUInt32(hint, 44, next.Raw);
             success = BuildTrstProof(ref p, ref w, group, next, hint, tail, destination, count, out var ready);
             if (success && ready)
-                success = ContinueTrstWriteReady(ref p, ref pending, ref r, group, next, out handled, out _);
+                success = ContinueTrstWriteReady(ref p, ref pending, ref r, group, next, out handled, out _, deferUpdates: true);
         }
         if (handled)
         {
             // No fallible operation remains after the unpublished payload and
             // bounded owned-image edits. The whole new view becomes accepted.
             p.WriteUInt32(group, 16, next.Raw); p.WriteUInt32(group, 20, active.Raw);
+            // Ready may have sealed a deferred run before this arena swap.
+            // No block access/callback intervenes. Rebind its private seal to
+            // the accepted arena identities before exposing the new view.
+            if (p.ReadUInt32(next, 12) == group.Raw)
+                p.WriteUInt32(group, TrstDeferredSeal, TrstRunSeal(ref p, group, next));
         }
         else
         {

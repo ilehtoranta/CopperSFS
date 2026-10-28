@@ -51,7 +51,7 @@ public static partial class AmigaSmartFileSystemWriteCore
     {
         p.WriteUInt32(group, 24, w.RootContainer); p.WriteUInt32(group, 28, w.BitmapBase);
         p.WriteUInt32(group, 32, w.AdminContainer); p.WriteUInt32(group, 36, w.NodeRoot);
-        p.WriteUInt32(group, 40, w.ExtentRoot); p.WriteUInt32(group, 44, w.CaseSensitive ? 1u : 0u);
+        p.WriteUInt32(group, 40, w.ExtentRoot); p.WriteUInt32(group, 44, (w.CaseSensitive ? 1u : 0u) | (w.Recycling ? 2u : 0u));
         p.WriteUInt32(group, 48, w.BlockCount); p.WriteUInt32(group, 52, w.BlockBytes);
         p.WriteUInt32(group, 56, w.ReservedBlocks);
     }
@@ -61,7 +61,8 @@ public static partial class AmigaSmartFileSystemWriteCore
     {
         w.RootContainer = p.ReadUInt32(group, 24); w.BitmapBase = p.ReadUInt32(group, 28);
         w.AdminContainer = p.ReadUInt32(group, 32); w.NodeRoot = p.ReadUInt32(group, 36);
-        w.ExtentRoot = p.ReadUInt32(group, 40); w.CaseSensitive = p.ReadUInt32(group, 44) != 0;
+        w.ExtentRoot = p.ReadUInt32(group, 40); w.CaseSensitive = (p.ReadUInt32(group, 44) & 1) != 0;
+        w.Recycling = (p.ReadUInt32(group, 44) & 2) != 0;
         w.BlockCount = p.ReadUInt32(group, 48); w.BlockBytes = p.ReadUInt32(group, 52);
         w.ReservedBlocks = p.ReadUInt32(group, 56);
     }
@@ -71,8 +72,16 @@ public static partial class AmigaSmartFileSystemWriteCore
     /// accepted Write together. On failure the prior accepted view is retained.
     /// Capacity failure never publishes a prefix; callers may flush that prior
     /// group and retry the whole request. Other operations require a group flush.
+    /// Eager continuation prepares an optional next-Write proof. Disabling it
+    /// leaves the accepted Write fully admitted; the next Write builds its proof
+    /// through the existing checked fallback, spreading cold-path work.
     /// All volume access must remain serialized and observe RedoOverlay.</summary>
     public static bool WriteTrstGroup<T>(ref T p, ref Work w, ref Request r, APTR group, out uint actual)
+        where T : struct, IAmigaWritableFileSystemPlatform =>
+        WriteTrstGroup(ref p, ref w, ref r, group, out actual, eagerContinuation: true);
+
+    /// <summary>Accept a complete Write, optionally preparing the next continuation eagerly.</summary>
+    public static bool WriteTrstGroup<T>(ref T p, ref Work w, ref Request r, APTR group, out uint actual, bool eagerContinuation)
         where T : struct, IAmigaWritableFileSystemPlatform
     {
         actual = 0; w.Error = DOS.Error.None; w.TrstObjectHint = APTR.Null; w.TrstContinuation = APTR.Null;
@@ -143,7 +152,7 @@ public static partial class AmigaSmartFileSystemWriteCore
         if (success)
         {
             success = TrstGroupHasJournalSpace(ref p, ref w, group, next, out var continuationSafe);
-            if (success && continuationSafe && p.ReadUInt32(group, TrstGroupContinuation) != 0)
+            if (eagerContinuation && success && continuationSafe && p.ReadUInt32(group, TrstGroupContinuation) != 0)
             {
                 // The conservative admission covers every future allocation in
                 // the touched maps. Construct the next window while that exact

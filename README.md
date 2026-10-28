@@ -1,21 +1,29 @@
 # CopperSFS
 
+Current source includes bounded TRST transactions and legacy CSUN recovery.
+See [the mainline integration notes](docs/trst-mainline-integration.md) for
+atomicity, durability policy and validation scope. Released packages retain
+their separately documented build and qualification identities.
+The [Write tail and p95 report](docs/trst-tail-latency.md) records the current
+optimization, its checkpoint tradeoff and compiled-handler checks.
+
 CopperSFS is an experimental, allocation-free implementation of the classic
 Amiga Smart File System on-disk format (`SFS\0`). This repository contains the
 portable filesystem core and its host tests.
 
-**Status: experimental preview.** [Preview.3](https://github.com/ilehtoranta/CopperSFS/releases/tag/v0.1.0-preview.3)
-provides a buffered 68020 handler, an optional strict 68020 handler, and a
-separate 68000 compatibility package with limited validation. Select the
-package for your CPU and read the updated [installation and upgrade guide](docs/handler-install.md).
+**Status: experimental preview.** [Preview.4](https://github.com/ilehtoranta/CopperSFS/releases/tag/v0.1.0-preview.4)
+provides a buffered 68020 handler with a 256 KiB clean-data cache, optional
+68020 binaries with other cache sizes or strict writes, and a separate 68000
+compatibility package with limited validation. Select the package for your CPU
+and read the [installation and upgrade guide](docs/handler-install.md).
 The handler integration source is not part of this repository. The external
 handler has been compared with
 original SmartFilesystem 1.279 under Kickstart 3.1, including clean handoff and
 write/flush interruption sweeps. Source changes and published preview binaries
 have separate qualification records: see [validation](docs/validation.md).
 Other ROM versions and physical hardware remain unqualified. Use only a
-disposable volume with an independent backup. Buffered writes are
-the default in preview.3; recent unflushed changes may be lost after a crash.
+disposable volume with an independent backup. Buffered writes are the default
+in preview.4; recent unflushed changes may be lost after a crash.
 
 Source now also provides explicit [manual TRIM](docs/manual-trim.md) through
 optional SCSI UNMAP support and the `CopperSFSTrim` command source. This is not
@@ -40,16 +48,23 @@ The engine does not format volumes. It uses classic 32-bit AmigaDOS file sizes
 and seek positions. A partition above 4 GiB additionally needs a block device
 with TD64 or NSD 64-bit I/O; block-device integration is outside this core.
 
-CopperSFS writes a private `CSUN` undo journal. If power is lost during a
-CopperSFS mutation, remount with CopperSFS to recover it before exposing the
-volume through another SFS implementation. Recovery requires a writable device
-and an intact journal. See [compatibility and recovery](docs/compatibility.md).
+The core provides original-format `TRST` and legacy `CSUN` journals. Current
+classic standalone builds default to buffered TRST with whole-Write atomicity.
+An interrupted legacy CSUN transaction still needs CopperSFS recovery before
+the volume is exposed through another SFS implementation. Recovery requires a
+writable device and an intact journal. See [compatibility and recovery](docs/compatibility.md).
 
 Integrators can select bounded buffered writes or strict per-operation
 durability. Buffered changes are immediately visible to readers; an explicit
 filesystem flush makes the checkpoint durable. Recent unflushed changes may
 be lost after a crash. Both policies use the same recovery protocol. See
 [buffering and integration](docs/transaction-batching.md).
+
+An optional caller-owned [clean-data cache](docs/data-cache.md) can retain file
+data without adding device requests or changing durability. The packaged 68020
+handlers offer fixed cache budgets; choose the executable in the
+[installation guide](docs/handler-install.md). Integrators control memory,
+admission and invalidation in their own adapters.
 
 ## Build and test
 

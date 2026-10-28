@@ -1,0 +1,69 @@
+{
+  "version": "v0.1.0-preview.4",
+  "qualifiedCoreRevision": "0c64478a5a01f92162ae27db951b4e9f5fa09a30",
+  "handlers": [
+    {
+      "cpu": "68020",
+      "file": "CopperSFS",
+      "policy": "buffered",
+      "cacheKiB": 256,
+      "bytes": 108460,
+      "sha256": "370dae61ef6cc1dc9f4c143d4e7c30f96d49bad9cbe5284af669788cb308c280",
+      "qualification": "Full Kickstart 3.1 / 68020 correctness, recovery and five-trial A/B performance comparison; cache coherence, cold/warm reads and memory measurement."
+    },
+    {
+      "cpu": "68020",
+      "file": "CopperSFS-strict",
+      "policy": "strict",
+      "cacheKiB": 256,
+      "bytes": 108252,
+      "sha256": "567c5f5c901185ab0d16348e7b97442225351d0e65db9ab0af57161cc37e7409",
+      "qualification": "Kickstart 3.1 / 68020 strict correctness, recovery, clean handoff, cache coherence and memory measurement; no performance claim."
+    },
+    {
+      "cpu": "68020",
+      "file": "CopperSFS-cache0",
+      "policy": "buffered",
+      "cacheKiB": 0,
+      "bytes": 108456,
+      "sha256": "e329baafdf1ba725c55d50d704eeb755b6be3913ee9c8a3266a5e3a0f073ecff",
+      "qualification": "Cache memory and coherence checks on the 68020 profile; no full A/B recovery sweep or performance claim for this variant."
+    },
+    {
+      "cpu": "68020",
+      "file": "CopperSFS-cache128",
+      "policy": "buffered",
+      "cacheKiB": 128,
+      "bytes": 108460,
+      "sha256": "3088bd04f3ccb44f3ace06e5647483cf9b7347d8e50e8a6fcc0e32a1d7084e72",
+      "qualification": "Cache memory and coherence checks on the 68020 profile; no full A/B recovery sweep or performance claim for this variant."
+    },
+    {
+      "cpu": "68020",
+      "file": "CopperSFS-cache512",
+      "policy": "buffered",
+      "cacheKiB": 512,
+      "bytes": 108460,
+      "sha256": "31012be4b56d25b1206b943f1e359de3f8bb9a7112b871ec86434a00f3a17bb3",
+      "qualification": "Cache memory and coherence checks on the 68020 profile; no full A/B recovery sweep or performance claim for this variant."
+    },
+    {
+      "cpu": "68020",
+      "file": "CopperSFS-cache2048",
+      "policy": "buffered",
+      "cacheKiB": 2048,
+      "bytes": 108460,
+      "sha256": "1c19f1cfcd46aebf98bf7461a9e2da672fbdcca56673028c76eabed45faf8363",
+      "qualification": "Cache memory and coherence checks on the 68020 profile, with allocation falling back to 1024 KiB; full 2048 KiB allocation, full A/B recovery sweep and performance remain unqualified for this variant."
+    },
+    {
+      "cpu": "68000",
+      "file": "CopperSFS",
+      "policy": "buffered",
+      "cacheKiB": 256,
+      "bytes": 110256,
+      "sha256": "9f8da0cd3a3ebbf9db7669ec4775e955391620ec958a0d36def3dd7f7591a99f",
+      "qualification": "Mount/read, write/read, shared workload/remount, concurrent workers and cache coherence on the 68020 profile only. Full 68000 Kickstart boot, native exhaustive recovery, performance and physical hardware remain unqualified."
+    }
+  ]
+}

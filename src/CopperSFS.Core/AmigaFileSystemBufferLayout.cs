@@ -56,7 +56,8 @@ public static class AmigaSmartFileSystemWriteBufferLayout
         public const int Hidden = 16;
         public const int PendingCommit = 20;
         public const int GeometryValid = 24;
-        // Offset 28 is reserved; do not compact the native adapter layout.
+        // Cached volume policy; shares the GeometryValid lifetime.
+        public const int VolumeFlags = 28;
         public const int RootContainer = 32;
         public const int BitmapBase = 36;
         public const int AdminContainer = 40;

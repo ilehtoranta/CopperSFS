@@ -6,23 +6,13 @@ public static partial class AmigaSmartFileSystemWriteCore
 {
     private const uint RecycledNode = 2;
 
-    private static bool RecyclingEnabled<T>(ref T p, ref Work w, out bool enabled)
-        where T : struct, IAmigaWritableFileSystemPlatform
-    {
-        enabled = false;
-        if (!AmigaSmartFileSystemCore.Root(ref p, w.Data)) return Fail(ref w, DOS.Error.DiskNotValidated);
-        enabled = (p.ReadUInt8(w.Data, 20) & 64) != 0;
-        return true;
-    }
-
     private static uint FileBlocks(uint size, uint bytes) => size / bytes + (size % bytes == 0 ? 0u : 1u);
 
     private static bool RecycledSizeChange<T>(ref T p, ref Work w, uint parent, uint before, uint after)
         where T : struct, IAmigaWritableFileSystemPlatform
     {
         if (parent != RecycledNode) return true;
-        if (!RecyclingEnabled(ref p, ref w, out var enabled)) return false;
-        if (enabled) w.RecycledBlocksDelta += (int)FileBlocks(after, w.BlockBytes) - (int)FileBlocks(before, w.BlockBytes);
+        if (w.Recycling) w.RecycledBlocksDelta += (int)FileBlocks(after, w.BlockBytes) - (int)FileBlocks(before, w.BlockBytes);
         return true;
     }
 
@@ -53,6 +43,15 @@ public static partial class AmigaSmartFileSystemWriteCore
         return suffix == 0 ? (byte)'$' : (byte)('A' + (((attempt - 1) >> (int)((3 - suffix) * 4)) & 15));
     }
 
+    private static void CopyRecycledName<T>(ref T p, APTR source, int nameAt, APTR target,
+        uint length, uint attempt) where T : struct, IAmigaFileSystemPlatform
+    {
+        var stem = attempt == 0 ? length : length - 4;
+        p.Copy(APTR.FromPointer(source.Raw + (uint)nameAt), target, stem);
+        for (var i = stem; i < length; i++)
+            p.WriteUInt8(target, (int)i, RecycledNameByte(ref p, source, nameAt, i, length, attempt));
+    }
+
     private static ushort RecycledHash<T>(ref T p, ref Work w, ref Request r, int nameAt)
         where T : struct, IAmigaWritableFileSystemPlatform
     {
@@ -67,22 +66,23 @@ public static partial class AmigaSmartFileSystemWriteCore
         return (ushort)hash;
     }
 
-    private static bool RecycleFile<T>(ref T p, ref Work w, uint node, uint nameLength)
+    private static bool RecycleFile<T>(ref T p, ref Work w, uint node, APTR source, int at, uint nameLength)
         where T : struct, IAmigaWritableFileSystemPlatform
     {
+        p.Copy(source, w.Bitmap, w.BlockBytes);
+        w.PreserveBitmap = true;
         var stem = nameLength > 96 ? 96u : nameLength;
         for (var attempt = 0u; attempt <= 4096; attempt++)
         {
-            if (!Object(ref p, ref w, node, w.Meta, out var at)) return Fail(ref w, DOS.Error.DiskNotValidated);
             var length = stem + (attempt == 0 ? 0u : 4u);
-            for (var i = 0u; i < length; i++)
-                p.WriteUInt8(w.Data, (int)i, RecycledNameByte(ref p, w.Meta, at + 25, i, length, attempt));
-            var found = AmigaSmartFileSystemCore.Resolve(ref p, RecycledNode, w.Data, length, w.Meta, out var error);
+            CopyRecycledName(ref p, w.Bitmap, at + 25, w.Data, length, attempt);
+            var found = AmigaSmartFileSystemCore.ResolveFromRoots(ref p, RecycledNode, w.Data, length, w.Meta, w.RootContainer, w.NodeRoot,
+                w.BlockCount, w.BlockBytes, w.CaseSensitive, out var error, out _, out _);
             if (found == 0)
             {
                 if (error != DOS.Error.ObjectNotFound) return Fail(ref w, error);
                 var request = new Request { Node = node, Directory = RecycledNode, Length = length, Position = attempt };
-                return RenameOperation(ref p, ref w, ref request, recycling: true);
+                return RenameOperation(ref p, ref w, ref request, recycling: true, recycledAt: at, recycledNameLength: nameLength);
             }
         }
         return Fail(ref w, DOS.Error.ObjectExists);
