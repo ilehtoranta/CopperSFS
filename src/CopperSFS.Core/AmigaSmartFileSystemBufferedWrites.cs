@@ -1,4 +1,6 @@
 using Amiga;
+using BufferHeader = CopperSFS.AmigaSmartFileSystemWriteBufferLayout.Header;
+using BufferEntry = CopperSFS.AmigaSmartFileSystemWriteBufferLayout.Entry;
 
 namespace CopperSFS;
 
@@ -15,6 +17,26 @@ public static partial class AmigaSmartFileSystemWriteCore
     private static APTR Edit<T>(ref T p, ref Work w, uint block, uint id, APTR scratch)
         where T : struct, IAmigaWritableFileSystemPlatform
     {
+        if (w.RedoStaging)
+        {
+            var arena = p.RedoOverlay;
+            var retained = AmigaSmartFileSystemRedoArena.MetadataView(ref p, arena, block, id, true, out var found);
+            if (!found)
+            {
+                var original = View(ref p, ref w, block, id, scratch);
+                // Copy the verified view directly into our owned arena before
+                // any further block I/O can expire it. Avoid the scratch copy.
+                if (original.IsNull || block < w.ReservedBlocks || block >= w.BlockCount - 1 ||
+                    !AmigaSmartFileSystemRedoArena.Store(ref p, arena, block, original))
+                { FailUnlessSet(ref w); return APTR.Null; }
+                retained = AmigaSmartFileSystemRedoArena.Find(ref p, arena, block);
+            }
+            else if (retained.IsNull)
+            { Fail(ref w, DOS.Error.DiskNotValidated); return APTR.Null; }
+            // The entire arena is private until publication. Every caller seals
+            // and publishes this image before another metadata access.
+            return retained;
+        }
         if (w.Buffered.IsNull || !w.JournalActive || w.BufferCommitting)
             return Read(ref p, ref w, block, id, scratch) ? scratch : APTR.Null;
         var slot = AmigaSmartFileSystemWriteBuffer.Find(ref p, w.Buffered, w.BlockBytes, block);
@@ -24,7 +46,7 @@ public static partial class AmigaSmartFileSystemWriteCore
             slot = AmigaSmartFileSystemWriteBuffer.Find(ref p, w.Buffered, w.BlockBytes, block);
         }
         var image = AmigaSmartFileSystemWriteBuffer.Image(slot);
-        if (p.ReadUInt32(slot, 8) != id && !AmigaFileSystemBlockIo.ValidateMetadata(ref p, block, id, image, w.BlockBytes))
+        if (p.ReadUInt32(slot, BufferEntry.VerifiedId) != id && !AmigaFileSystemBlockIo.ValidateMetadata(ref p, block, id, image, w.BlockBytes))
         { Fail(ref w, DOS.Error.DiskNotValidated); return APTR.Null; }
         // Capture the savepoint before handing out a mutable private image.
         // Every caller seals and publishes it before another metadata lookup.
@@ -38,17 +60,17 @@ public static partial class AmigaSmartFileSystemWriteCore
         uint image = 0, entry = 0;
         var existing = AmigaSmartFileSystemWriteBuffer.Find(ref p, w.Buffered, w.BlockBytes, target);
         if (existing.IsNotNull && source == AmigaSmartFileSystemWriteBuffer.Image(existing) &&
-            p.ReadUInt32(existing, 4) != 0)
+            p.ReadUInt32(existing, BufferEntry.Touched) != 0)
         {
             // Edit already captured this operation's savepoint before exposing
             // the owned image. Publishing it only restores its verification;
             // there is no second copy or savepoint to capture.
-            p.WriteUInt32(existing, 8, verifiedId);
+            p.WriteUInt32(existing, BufferEntry.VerifiedId, verifiedId);
             return true;
         }
         if (existing.IsNull)
         {
-            if (AmigaSmartFileSystemWriteBuffer.Count(ref p, w.Buffered) == p.ReadUInt32(w.Buffered, 4))
+            if (AmigaSmartFileSystemWriteBuffer.Count(ref p, w.Buffered) == p.ReadUInt32(w.Buffered, BufferHeader.Capacity))
             { w.BufferFull = true; return Fail(ref w, DOS.Error.NoFreeStore); }
             // Reserve rollback sectors before acknowledging a dirty block. The
             // allocator excludes these RAM reservations until the group commits.
@@ -65,12 +87,12 @@ public static partial class AmigaSmartFileSystemWriteCore
     public static bool Recover<T>(ref T p, ref Work w) where T : struct, IAmigaWritableFileSystemPlatform
     {
         if (w.Buffered.IsNotNull)
-        { p.WriteUInt32(w.Buffered, 16, 1); p.WriteUInt32(w.Buffered, 24, 0); p.WriteUInt32(w.Buffered, 68, 0); }
+        { p.WriteUInt32(w.Buffered, BufferHeader.Hidden, 1); p.WriteUInt32(w.Buffered, BufferHeader.GeometryValid, 0); p.WriteUInt32(w.Buffered, BufferHeader.CachedNode, 0); }
         var success = RecoverDisk(ref p, ref w);
         if (w.Buffered.IsNotNull)
         {
-            p.WriteUInt32(w.Buffered, 16, 0);
-            if (success) p.WriteUInt32(w.Buffered, 20, 0);
+            p.WriteUInt32(w.Buffered, BufferHeader.Hidden, 0);
+            if (success) p.WriteUInt32(w.Buffered, BufferHeader.PendingCommit, 0);
         }
         return success;
     }
@@ -84,26 +106,26 @@ public static partial class AmigaSmartFileSystemWriteCore
     {
         w.Error = DOS.Error.None;
         if (w.Buffered.IsNull) return p.Flush() || Fail(ref w, DOS.Error.DiskNotValidated);
-        if (p.ReadUInt32(w.Buffered, 20) != 0 && !Recover(ref p, ref w)) return false;
+        if (p.ReadUInt32(w.Buffered, BufferHeader.PendingCommit) != 0 && !Recover(ref p, ref w)) return false;
         var count = AmigaSmartFileSystemWriteBuffer.Count(ref p, w.Buffered);
         if (count == 0) return p.Flush() || Fail(ref w, DOS.Error.DiskNotValidated);
         if (!Prepare(ref p, ref w)) return false;
         w.BufferCommitting = true; w.JournalActive = true; w.JournalWrapped = false;
         if (w.JournalCursor < w.ReservedBlocks || w.JournalCursor >= w.BlockCount - 1)
             w.JournalCursor = w.ReservedBlocks;
-        p.WriteUInt32(w.Buffered, 20, 1);
+        p.WriteUInt32(w.Buffered, BufferHeader.PendingCommit, 1);
         var success = true;
         var slot = AmigaSmartFileSystemWriteBuffer.First(w.Buffered);
         for (var i = 0u; i < count && success; i++, slot = AmigaSmartFileSystemWriteBuffer.Next(slot, w.BlockBytes))
         {
-            success = JournalWrite(ref p, ref w, p.ReadUInt32(slot), AmigaSmartFileSystemWriteBuffer.Image(slot));
+            success = JournalWrite(ref p, ref w, p.ReadUInt32(slot, BufferEntry.Block), AmigaSmartFileSystemWriteBuffer.Image(slot));
         }
         if (success) success = Finish(ref p, ref w);
         w.BufferCommitting = false; w.JournalActive = false;
         if (success)
         {
             AmigaSmartFileSystemWriteBuffer.Discard(ref p, w.Buffered);
-            p.WriteUInt32(w.Buffered, 20, 0);
+            p.WriteUInt32(w.Buffered, BufferHeader.PendingCommit, 0);
         }
         return success;
     }
@@ -116,14 +138,14 @@ public static partial class AmigaSmartFileSystemWriteCore
         var original = r;
         // Only consecutive writes preserve a record's location. Namespace,
         // size and metadata operations can compact or relocate containers.
-        if (buffer.IsNotNull && operation != 5) p.WriteUInt32(buffer, 68, 0);
-        if (buffer.IsNotNull && p.ReadUInt32(buffer, 20) != 0 && !Recover(ref p, ref w)) return false;
+        if (buffer.IsNotNull && operation != 5) p.WriteUInt32(buffer, BufferHeader.CachedNode, 0);
+        if (buffer.IsNotNull && p.ReadUInt32(buffer, BufferHeader.PendingCommit) != 0 && !Recover(ref p, ref w)) return false;
         for (var attempt = 0; attempt < 2; attempt++)
         {
             w.BufferFull = false;
             if (w.Buffered.IsNotNull)
             {
-                w.BlockBytes = p.ReadUInt32(buffer, 24) != 0 ? p.ReadUInt32(buffer, 60) : p.BlockBytes;
+                w.BlockBytes = p.ReadUInt32(buffer, BufferHeader.GeometryValid) != 0 ? p.ReadUInt32(buffer, BufferHeader.BlockBytes) : p.BlockBytes;
                 AmigaSmartFileSystemWriteBuffer.Begin(ref p, buffer, w.BlockBytes);
             }
             var success = operation switch
@@ -142,7 +164,7 @@ public static partial class AmigaSmartFileSystemWriteCore
                 (w.Error != DOS.Error.DiskFull || AmigaSmartFileSystemWriteBuffer.Count(ref p, buffer) == 0)))
             {
                 w.Buffered = buffer;
-                if (buffer.IsNotNull) p.WriteUInt32(buffer, 16, 0);
+                if (buffer.IsNotNull) p.WriteUInt32(buffer, BufferHeader.Hidden, 0);
                 if (!success) { r = original; actual = 0; }
                 return success;
             }
@@ -151,7 +173,7 @@ public static partial class AmigaSmartFileSystemWriteCore
             // publish a partial operation merely to make room in RAM.
             if (!Flush(ref p, ref w)) { r = original; actual = 0; return false; }
             w.Buffered = APTR.Null;
-            p.WriteUInt32(buffer, 16, 1);
+            p.WriteUInt32(buffer, BufferHeader.Hidden, 1);
             r = original; actual = 0;
         }
         return false;

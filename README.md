@@ -17,6 +17,10 @@ Other ROM versions and physical hardware remain unqualified. Use only a
 disposable volume with an independent backup. Buffered writes are
 the default in preview.3; recent unflushed changes may be lost after a crash.
 
+Source now also provides explicit [manual TRIM](docs/manual-trim.md) through
+optional SCSI UNMAP support and the `CopperSFSTrim` command source. This is not
+in the published preview.3 binaries. Automatic trimming is disabled.
+
 ## What is here
 
 - `src/CopperSFS.Core`: read, write and recovery logic for classic `SFS\0`

@@ -1,5 +1,49 @@
 # Validation boundary
 
+## Manual TRIM development validation (2026-10-22)
+
+The new manual-discard source is separate from the immutable preview.3 release.
+See [manual TRIM](manual-trim.md) for commands, backend requirements and recovery
+ordering. Automatic trimming remains disabled.
+
+All 207 portable-core tests passed in Debug and Release. The added sweeps cut
+at every checkpoint write/flush and discarded sector on a 128-block fixture for
+five mutations, buffered/strict modes, small/full queues, three discard patterns
+and volatile-sector persistence subsets. Restarted manual TRIM replays recovery
+before discarding. Tests also cover original TRST replay, partial failure/retry,
+multiple bitmaps, corruption, limits, all 120 writer/reader/trim orders and threads
+queued behind a blocked discard.
+
+Separate native integration evidence includes 75 compiled MC68000 checks (six
+new SCSI/UNMAP cases), 30 additional host filesystem tests, 15 Kickstart 3.1 A/B
+correctness cases and seven manual-TRIM scenarios per handler variant. Buffered
+68020, strict 68020 and buffered 68000 HUNKs passed those scenarios under the
+68020 test machine, including the command, concurrent guest writers, independent
+amidisk deep checks and remounts. This does not qualify the complete 68000 handler
+on a 68000 machine or physical hardware. A separate 47-case buffered native cut
+run covers all 22 checkpoint sector writes and four flushes, plus first/middle/last
+sectors of each UNMAP request (21 discard cuts). Every image recovered successfully.
+The native discard cuts sample large ranges; the small host fixture sweep is
+exhaustive within its stated sector crash model.
+
+Five trials of all six normal A/B workloads passed for the new handler; another
+five-trial comparison used the previous preview.3 handler under the same runtime.
+Normal device-request counts are identical to preview.3. Write CPU medians are
+0.36–0.48% lower; warm-read cycles are 0.55% higher. Treat the small differences as
+code-layout effects, not a write-engine optimization. New sequential 1 MiB writes
+use 13,496,430 guest cycles versus original SFS's 14,408,800, with request counts
+1/131/4 reads/writes/flushes versus original 0/132/4. Both handlers start each trial
+from a fresh clone of the same base. Manual maintenance time is excluded.
+
+Qualified development buffered 68020 HUNK: 111,400 bytes, SHA-256
+`D3F9BF486A45754D44329B2A2D60CD39B27BC8A736BF1576B6B1C933A24E8238`.
+A fresh build of the final source produced identical HUNK bytes. The command is
+1,356 bytes, SHA-256
+`3EF54A7B3DC00199D32972F398086CA4C426831E160B6FE2F3AF4E097A9B3138`.
+These are validation artifacts, not a published package. No original handler,
+licensed ROM or disk image is included in this repository.
+
+
 ## Preview.3 package identity
 
 The `v0.1.0-preview.3` packages use the exact handler bytes qualified below,

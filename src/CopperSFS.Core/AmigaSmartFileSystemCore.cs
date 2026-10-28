@@ -13,7 +13,7 @@ public static partial class AmigaSmartFileSystemCore
     public const uint RootNode = 1;
     private const uint RootId = DosType, ObjectId = 0x4F424A43, NodeId = 0x4E444320, TreeId = 0x424E4443;
 
-    internal static uint BlockSum<T>(ref T p, APTR block, uint bytes) where T : struct, IAmigaFileSystemPlatform
+    internal static uint BlockSum<T>(ref T p, APTR block, uint bytes) where T : struct, IAmigaGuestMemory
     {
         var remaining = bytes;
         var cursor = block;
@@ -62,7 +62,7 @@ public static partial class AmigaSmartFileSystemCore
     private static APTR View<T>(ref T p, uint block, uint id, APTR scratch, uint blockCount)
         where T : struct, IAmigaFileSystemPlatform => block < blockCount ? p.ReadMetadataView(block, id, scratch) : APTR.Null;
 
-    private static APTR RootView<T>(ref T p, APTR scratch) where T : struct, IAmigaFileSystemPlatform
+    internal static APTR RootView<T>(ref T p, APTR scratch) where T : struct, IAmigaFileSystemPlatform
     {
         var blockCount = p.BlockCount; var blockBytes = p.BlockBytes;
         return RootView(ref p, scratch, blockCount, blockBytes);
@@ -457,8 +457,26 @@ public static partial class AmigaSmartFileSystemCore
         var blockCount = cursor.BlockCount;
         var fileBlock = position / blockBytes;
         var extent = cursor.Extent; var extentStart = cursor.Start; var extentSize = cursor.Count; var next = cursor.Next;
-        if (fileBlock < extentStart) { extent = cursor.First; extentStart = 0; extentSize = 0; next = 0; }
         var copied = 0u;
+        // The preceding packet already validated this extent. A complete,
+        // aligned request within it needs no metadata traversal or copy.
+        if (extentSize != 0 && (position % blockBytes) == 0 &&
+            (length % blockBytes) == 0 && (destination.Raw & 3) == 0 &&
+            fileBlock >= extentStart && fileBlock - extentStart < extentSize)
+        {
+            var blocks = length / blockBytes;
+            if (blocks <= extentSize - (fileBlock - extentStart))
+            {
+                var diskBlock = extent + fileBlock - extentStart;
+                if (diskBlock >= blockCount || blocks > blockCount - diskBlock) goto failed;
+                var read = p.ReadDataBlocks(diskBlock, blocks, destination);
+                if (read > blocks) goto failed;
+                copied = read * blockBytes;
+                if (read != blocks) goto failed;
+                return (int)copied;
+            }
+        }
+        if (fileBlock < extentStart) { extent = cursor.First; extentStart = 0; extentSize = 0; next = 0; }
         while (copied < length)
         {
             while (extentSize == 0 || fileBlock >= extentStart + extentSize)

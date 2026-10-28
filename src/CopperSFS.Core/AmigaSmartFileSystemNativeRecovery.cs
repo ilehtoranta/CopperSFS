@@ -123,11 +123,19 @@ public static partial class AmigaSmartFileSystemWriteCore
         where T : struct, IAmigaWritableFileSystemPlatform
     {
         if (!NativePass(ref p, ref w, first, false)) return false;
-        if (!NativePass(ref p, ref w, first, true) || !p.Flush())
+        if (!NativePass(ref p, ref w, first, true))
             return Fail(ref w, DOS.Error.DiskNotValidated);
+        return CompleteNative(ref p, ref w, marker);
+    }
+
+    private static bool CompleteNative<T>(ref T p, ref Work w, uint marker)
+        where T : struct, IAmigaWritableFileSystemPlatform
+    {
+        // Keep TRFA (or the inline TRST) until every home image is durable.
+        if (!p.Flush()) return Fail(ref w, DOS.Error.DiskNotValidated);
         p.Clear(w.Meta, w.BlockBytes);
         p.WriteUInt32(w.Meta, 0, TransactionOk); p.WriteUInt32(w.Meta, 8, marker);
-        Seal(ref p, w.Meta, w.BlockBytes);
-        return (p.WriteBlock(marker, w.Meta) && p.Flush()) || Fail(ref w, DOS.Error.DiskNotValidated);
+        Seal(ref p, w.Meta, 12);
+        return (TrstWriteBlock(ref p, marker, w.Meta) && p.Flush()) || Fail(ref w, DOS.Error.DiskNotValidated);
     }
 }
